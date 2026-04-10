@@ -5,14 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Team Sheet</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@500;700&display=swap');
   *{margin:0;padding:0;box-sizing:border-box;-webkit-user-select:none;user-select:none;touch-action:none}
   
-  html,body{height:100%;overflow:hidden;font-family:'Barlow Condensed',sans-serif;background:#0d3a1a;}
+  html,body{height:100%;overflow:hidden;font-family:'Barlow Condensed',sans-serif;background:#051b43;}
   
   #app{
     height:100dvh; width:100vw; position:relative; overflow:hidden;
-    background:radial-gradient(circle at 50% 38%, #1e6b35 0%, #0d3a1a 100%);
+    background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 20%, rgba(0,0,0,0.6) 100%),
+                repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0px, rgba(255,255,255,0.04) 2px, transparent 2px, transparent 14px),
+                #073175; 
     display:flex; align-items:center; justify-content:center;
   }
   
@@ -22,77 +24,66 @@
     height:100%; max-height:900px;
   }
   
-  #ground svg.bg{position:absolute;inset:0;width:100%;height:100%}
-  .zone-label{position:absolute;left:50%;transform:translateX(-50%);font-family:'Bebas Neue',sans-serif;font-size:13px;color:rgba(255,255,255,0.18);letter-spacing:3px;pointer-events:none;text-transform:uppercase;z-index:2}
+  #ground svg.bg{position:absolute;inset:0;width:100%;height:100%;z-index:1;}
+  
+  .zone-label{position:absolute;left:50%;transform:translateX(-50%);font-family:'Bebas Neue',sans-serif;font-size:14px;color:rgba(255,255,255,0.25);letter-spacing:4px;pointer-events:none;text-transform:uppercase;z-index:2}
   .zone-label.right-aligned{left:86%;transform:translateX(-50%)}
-  .divider{position:absolute;left:10%;width:80%;height:1px;background:rgba(255,255,255,0.08);z-index:2;pointer-events:none}
+  .divider{position:absolute;left:10%;width:80%;height:1.5px;background:rgba(255,255,255,0.15);z-index:2;pointer-events:none}
   
-  .pos-slot{position:absolute;width:58px;height:30px;border-radius:6px;border:2px dashed rgba(255,255,255,0.18);transform:translate(-50%,-50%);z-index:3;display:flex;align-items:center;justify-content:center;cursor:pointer}
-  .pos-slot:active{border-color:rgba(232,200,64,0.5);background:rgba(232,200,64,0.08)}
-  .pos-slot .pos-label{font-size:9px;color:rgba(255,255,255,0.25);text-transform:uppercase;letter-spacing:0.5px;pointer-events:none}
-  .pos-slot.filled{border:none;pointer-events:none}
+  .pos-slot{position:absolute;width:90px;height:28px;border-radius:2px;border:2px dashed rgba(255,255,255,0.3);transform:translate(-50%,-50%);z-index:3;display:flex;align-items:center;justify-content:center;cursor:pointer;background:rgba(255,255,255,0.02);}
+  .pos-slot .pos-label{font-size:10px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:1px;pointer-events:none;font-weight:bold;}
+  .pos-slot.filled{border:none;background:transparent;pointer-events:none}
   
-  .magnet{position:absolute;z-index:50;min-width:58px;height:30px;border-radius:6px;background:#e8c840;color:#111;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.3px;display:flex;align-items:center;justify-content:center;padding:0 8px;cursor:grab;box-shadow:0 2px 6px rgba(0,0,0,0.5);transform:translate(-50%,-50%);white-space:nowrap}
-  .magnet.dragging{box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:200;opacity:0.9;cursor:grabbing}
+  .magnet{
+    position:absolute;z-index:50;min-width:90px;height:28px;border-radius:2px;
+    background:#ffffff;color:#073175; 
+    font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13.5px;letter-spacing:0.3px;
+    display:flex;align-items:center;padding:0 6px 0 24px; 
+    cursor:grab;box-shadow:0 3px 10px rgba(0,0,0,0.3);transform:translate(-50%,-50%);white-space:nowrap;
+    transition: color 0.3s ease;
+  }
+  .magnet.dragging{box-shadow:0 10px 25px rgba(0,0,0,0.6);z-index:200;opacity:0.95;cursor:grabbing}
+  .magnet.warning { color: #8b0000 !important; }
+
+  .mag-badge {
+    position:absolute; left:-14px; top:50%; transform:translateY(-50%);
+    width:28px; height:28px; background:#6786b8; 
+    border-radius:50%; border:2px solid #ffffff; 
+    display:flex; justify-content:center; align-items:center;
+    font-size:12px; color:#fff; font-weight:800; box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+  }
   
-  #editOverlay{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.55);align-items:center;justify-content:center}
+  #editOverlay{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.65);align-items:center;justify-content:center;backdrop-filter:blur(2px);}
   #editOverlay.show{display:flex}
-  #editBox{background:#1a1a1a;border-radius:12px;padding:16px;width:260px;display:flex;flex-direction:column;gap:10px;box-shadow:0 12px 40px rgba(0,0,0,0.7);border:1px solid #333}
-  #editBox .edit-title{font-family:'Bebas Neue',sans-serif;font-size:16px;color:#e8c840;letter-spacing:2px}
-  #editBox input{height:40px;border:none;border-radius:8px;background:#222;color:#fff;padding:0 14px;font-size:16px;font-family:'Barlow Condensed',sans-serif;outline:none}
-  #editBox input:focus{box-shadow:0 0 0 2px #e8c840}
-  #editBox .btn-row{display:flex;gap:8px}
-  #editBox button{flex:1;height:38px;border:none;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;cursor:pointer;letter-spacing:0.5px}
-  #editBox .save-btn{background:#e8c840;color:#111}
-  #editBox .clear-btn{background:#333;color:#aaa}
-  #editBox .cancel-btn{background:#222;color:#666}
+  #editBox{background:#111827;border-radius:12px;padding:16px;width:260px;display:flex;flex-direction:column;gap:10px;box-shadow:0 12px 40px rgba(0,0,0,0.7);border:1px solid #1f2937}
+  #editBox .edit-title{font-family:'Bebas Neue',sans-serif;font-size:18px;color:#60a5fa;letter-spacing:2px}
+  #editBox label { font-size: 10px; color: #6b7280; font-weight: bold; margin-bottom: -5px; letter-spacing: 1px;}
+  #editBox input{height:40px;border:none;border-radius:8px;background:#1f2937;color:#fff;padding:0 14px;font-size:16px;font-family:'Barlow Condensed',sans-serif;outline:none}
+  #editBox input:focus{box-shadow:0 0 0 2px #60a5fa}
+  #editBox .btn-row{display:flex;gap:8px; margin-top: 5px;}
+  #editBox button{flex:1;height:38px;border:none;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;cursor:pointer;letter-spacing:0.5px}
+  #editBox .save-btn{background:#3b82f6;color:#fff}
+  #editBox .clear-btn{background:#374151;color:#9ca3af}
+  #editBox .cancel-btn{background:#1f2937;color:#6b7280}
   
-  #syncStatus{position:absolute;top:10px;right:10px;z-index:100;font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:1px}
-  
-  /* Corner Buttons */
-  #refreshBtn{position:absolute;top:10px;left:10px;z-index:100;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.15);color:#ccc;font-family:'Barlow Condensed',sans-serif;font-size:12px;padding:4px 10px;border-radius:6px;cursor:pointer;letter-spacing:1px;transition:all 0.2s;}
-  #refreshBtn:active{background:rgba(232,200,64,0.2);border-color:#e8c840;color:#e8c840;}
-  
-  #showTipsBtn{position:absolute;top:42px;left:10px;z-index:95;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.15);color:#ccc;font-family:'Barlow Condensed',sans-serif;font-size:12px;padding:4px 10px;border-radius:6px;cursor:pointer;letter-spacing:1px;transition:all 0.2s; display:none;}
-  #showTipsBtn:active{background:rgba(232,200,64,0.2);border-color:#e8c840;color:#e8c840;}
-  
-  /* Tips Panel */
-  #tipsPanel{position:absolute;top:42px;left:10px;z-index:98;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:12px;color:rgba(255,255,255,0.6);font-size:12px;backdrop-filter:blur(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.3);}
-  .tips-header {display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;}
-  #tipsPanel strong{color:#e8c840;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1.5px;opacity:0.9; margin:0;}
-  #closeTips{background:transparent; border:none; color:rgba(255,255,255,0.4); font-size:18px; cursor:pointer; padding:0 4px; margin-top:-4px;}
-  #closeTips:active{color:#fff;}
-  #tipsPanel ul{list-style:none;padding:0;}
-  #tipsPanel li{margin-bottom:5px;display:flex;gap:6px; align-items:center;}
-  #tipsPanel b{color:rgba(255,255,255,0.9);font-weight:600;}
+  #syncStatus{position:absolute;top:10px;right:10px;z-index:100;font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:1px}
+  #refreshBtn{position:absolute;top:10px;left:10px;z-index:100;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.2);color:#ddd;font-family:'Barlow Condensed',sans-serif;font-size:12px;padding:4px 10px;border-radius:6px;cursor:pointer;letter-spacing:1px;}
 </style>
 </head>
 <body>
 <div id="app">
   <button id="refreshBtn">↻ REFRESH</button>
-  <button id="showTipsBtn">💡 TIPS</button>
   <div id="syncStatus"></div>
-  
-  <div id="tipsPanel">
-    <div class="tips-header">
-      <strong>💡 Quick Tips</strong>
-      <button id="closeTips">×</button>
-    </div>
-    <ul>
-      <li><span>📱</span> <b>Edit:</b> Hold down a player</li>
-      <li><span>🔄</span> <b>Collab:</b> Auto-refreshes or click button</li>
-      <li><span>🤏</span> <b>Swap:</b> Drag one onto another</li>
-      <li><span>➕</span> <b>Add:</b> Tap an empty slot</li>
-    </ul>
-  </div>
-
   <div id="ground"></div>
 </div>
 
 <div id="editOverlay">
   <div id="editBox">
     <div class="edit-title" id="editTitle">FB</div>
-    <input id="editInput" type="text" placeholder="Player name…" enterkeyhint="done" autocomplete="off"/>
+    <label>PLAYER NAME</label>
+    <input id="editInput" type="text" placeholder="Name…" autocomplete="off"/>
+    <label>BADGE (C, 10, 🇮🇪)</label>
+    <input id="badgeInput" type="text" placeholder="Max 2 chars" maxlength="2" autocomplete="off"/>
     <div class="btn-row">
       <button class="save-btn" id="editSave">SAVE</button>
       <button class="clear-btn" id="editClear">CLEAR</button>
@@ -102,117 +93,65 @@
 </div>
 
 <script>
-// --- JSONBIN CONFIGURATION ---
 const BIN_ID = '69d861b7aaba882197e1984b';
 const API_KEY = '$2a$10$pzhEn9dwvvZP9ycmWjqIqOxQXIwhs.wWSOnj6BZv5SltQmU.XKXR6'; 
 const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
-const syncStatus = document.getElementById('syncStatus');
-const refreshBtn = document.getElementById('refreshBtn');
-const tipsPanel = document.getElementById('tipsPanel');
-const closeTipsBtn = document.getElementById('closeTips');
-const showTipsBtn = document.getElementById('showTipsBtn');
-const ground=document.getElementById('ground'),overlay=document.getElementById('editOverlay'),editTitle=document.getElementById('editTitle'),editInput=document.getElementById('editInput'),editSave=document.getElementById('editSave'),editClear=document.getElementById('editClear'),editCancel=document.getElementById('editCancel');
-
-// --- TIPS TOGGLE LOGIC ---
-if(localStorage.getItem('afl_hideTips') === 'true') {
-  tipsPanel.style.display = 'none';
-  showTipsBtn.style.display = 'block';
-} else {
-  tipsPanel.style.display = 'block';
-  showTipsBtn.style.display = 'none';
-}
-
-closeTipsBtn.addEventListener('click', () => {
-  tipsPanel.style.display = 'none';
-  showTipsBtn.style.display = 'block';
-  localStorage.setItem('afl_hideTips', 'true');
-});
-
-showTipsBtn.addEventListener('click', () => {
-  tipsPanel.style.display = 'block';
-  showTipsBtn.style.display = 'none';
-  localStorage.setItem('afl_hideTips', 'false');
-});
+const syncStatus = document.getElementById('syncStatus'),
+      refreshBtn = document.getElementById('refreshBtn'),
+      ground=document.getElementById('ground'),
+      overlay=document.getElementById('editOverlay'),
+      editTitle=document.getElementById('editTitle'),
+      editInput=document.getElementById('editInput'),
+      badgeInput=document.getElementById('badgeInput'),
+      editSave=document.getElementById('editSave'),
+      editClear=document.getElementById('editClear'),
+      editCancel=document.getElementById('editCancel');
 
 const positions=[
+  /* Forwardline */
   {id:'fpl',x:22,y:6,label:'FP'},{id:'ff',x:50,y:4,label:'FF'},{id:'fpr',x:78,y:6,label:'FP'},
   {id:'hfl',x:18,y:17,label:'HF'},{id:'chf',x:50,y:15,label:'CHF'},{id:'hfr',x:82,y:17,label:'HF'},
-  {id:'lw',x:8,y:36,label:'LW'},
-  {id:'ml',x:36,y:36,label:'MID'},
-  {id:'c',x:50,y:33,label:'C'},
-  {id:'rk',x:50,y:41,label:'RK'},
-  {id:'mr',x:64,y:36,label:'MID'},
-  {id:'rw',x:92,y:36,label:'RW'},
-  {id:'hbl',x:18,y:55,label:'HB'},{id:'chb',x:50,y:57,label:'CHB'},{id:'hbr',x:82,y:55,label:'HB'},
-  {id:'bpl',x:22,y:68,label:'BP'},{id:'fb',x:50,y:70,label:'FB'},{id:'bpr',x:78,y:68,label:'BP'},
-  {id:'ic1',x:14,y:82,label:'IC'},{id:'ic2',x:32,y:82,label:'IC'},
-  {id:'ic3',x:50,y:82,label:'IC'},{id:'ic4',x:68,y:82,label:'IC'},
-  {id:'emg',x:86,y:82,label:'EMG'},
-  {id:'e1',x:14,y:89,label:'---'},{id:'e2',x:32,y:89,label:'---'},
-  {id:'e3',x:50,y:89,label:'---'},{id:'e4',x:68,y:89,label:'---'},{id:'e5',x:86,y:89,label:'---'},
-  {id:'e6',x:14,y:96,label:'---'},{id:'e7',x:32,y:96,label:'---'},
-  {id:'e8',x:50,y:96,label:'---'},{id:'e9',x:68,y:96,label:'---'},{id:'e10',x:86,y:96,label:'---'},
+  
+  /* Midfield - Anchored around Y: 38% Centre */
+  {id:'lw',x:2,y:36,label:'LW'}, 
+  {id:'ml',x:26,y:36,label:'MID'}, 
+  {id:'c',x:50,y:26,label:'C'},
+  {id:'rk',x:50,y:46,label:'RK'}, 
+  {id:'mr',x:74,y:36,label:'MID'}, 
+  {id:'rw',x:98,y:36,label:'RW'}, 
+  
+  /* Defence - Flipped symmetry (Base baseline is roughly 76% Y) */
+  {id:'hbl',x:18,y:59,label:'HB'},{id:'chb',x:50,y:61,label:'CHB'},{id:'hbr',x:82,y:59,label:'HB'},
+  {id:'bpl',x:22,y:70,label:'BP'},{id:'fb',x:50,y:72,label:'FB'},{id:'bpr',x:78,y:70,label:'BP'},
+  
+  /* Bench */
+  {id:'ic1',x:14,y:82,label:'IC'},{id:'ic2',x:32,y:82,label:'IC'},{id:'ic3',x:50,y:82,label:'IC'},{id:'ic4',x:68,y:82,label:'IC'},{id:'emg',x:86,y:82,label:'EMG'},
+  {id:'e1',x:14,y:89,label:'---'},{id:'e2',x:32,y:89,label:'---'},{id:'e3',x:50,y:89,label:'---'},{id:'e4',x:68,y:89,label:'---'},{id:'e5',x:86,y:89,label:'---'},
+  {id:'e6',x:14,y:96,label:'---'},{id:'e7',x:32,y:96,label:'---'},{id:'e8',x:50,y:96,label:'---'},{id:'e9',x:68,y:96,label:'---'},{id:'e10',x:86,y:96,label:'---'},
 ];
 
-const zones=[{label:'FORWARD',y:9.5},{label:'MIDFIELD',y:29},{label:'DEFENCE',y:63.5}];
+const zones=[{label:'FORWARD',y:9.5},{label:'MIDFIELD',y:31},{label:'DEFENCE',y:66}];
 
 let roster={};
 let saveTimer=null;
 let editingPosId=null;
-let dragState=null; 
-let recentlyCleared = new Set(); 
+let dragState=null;
 
-// --- CLOUD LOGIC WITH BENCH RESCUE & CACHE BUSTING ---
 async function loadFromCloud(){
   try{
     syncStatus.textContent='syncing…';
-    
-    // ADDED: ?_t=${Date.now()} forces Android to bypass cache completely
     const res = await fetch(`${JSONBIN_URL}/latest?_t=${Date.now()}`, {
       headers: { 'X-Master-Key': API_KEY },
       cache: 'no-store' 
     });
-    
     if(res.ok){
       const data = await res.json();
-      const newRoster = data.record || {}; 
-      const oldRoster = JSON.parse(localStorage.getItem('afl_roster')||'{}');
-      
-      let rescued = false;
-      const remoteNames = Object.values(newRoster).map(n => n.toLowerCase().trim());
-
-      for (const [posId, name] of Object.entries(oldRoster)) {
-        if (!name) continue;
-        const normalized = name.toLowerCase().trim();
-
-        if (!remoteNames.includes(normalized) && !recentlyCleared.has(normalized)) {
-          for (let i = 1; i <= 10; i++) {
-            const benchId = 'e' + i;
-            if (!newRoster[benchId]) {
-              newRoster[benchId] = name;
-              rescued = true;
-              break;
-            }
-          }
-        }
-      }
-
-      roster = newRoster;
+      roster = data.record || {}; 
       localStorage.setItem('afl_roster', JSON.stringify(roster));
       syncStatus.textContent='synced';
-      
-      recentlyCleared.clear();
-      if (rescued) saveToCloud();
-      
-    } else {
-      syncStatus.textContent='error '+res.status;
-      roster=JSON.parse(localStorage.getItem('afl_roster')||'{}');
     }
-  }catch(e){
-    roster=JSON.parse(localStorage.getItem('afl_roster')||'{}');
-    syncStatus.textContent='offline';
-  }
+  }catch(e){syncStatus.textContent='offline'}
   renderAll();
 }
 
@@ -222,77 +161,42 @@ function saveToCloud(){
   saveTimer=setTimeout(async()=>{
     try{
       syncStatus.textContent='saving…';
-      const res = await fetch(JSONBIN_URL, {
+      await fetch(JSONBIN_URL, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Master-Key': API_KEY
-        },
+        headers: {'Content-Type': 'application/json','X-Master-Key': API_KEY},
         body: JSON.stringify(roster)
       });
-      if(res.ok){syncStatus.textContent='saved'}
-      else{syncStatus.textContent='error '+res.status}
+      syncStatus.textContent='saved';
     }catch(e){syncStatus.textContent='offline'}
   },500);
 }
 
-refreshBtn.addEventListener('click', async () => {
-  refreshBtn.textContent = '↻ REFRESHING...';
-  await loadFromCloud();
-  refreshBtn.textContent = '↻ REFRESH';
-});
+refreshBtn.addEventListener('click', loadFromCloud);
 
-// --- BULLETPROOF ANDROID WAKEUP TRIGGERS ---
-const triggerAutoRefresh = async () => {
-  if (!editingPosId && !dragState) {
-    refreshBtn.textContent = '↻ AUTO...';
-    await loadFromCloud();
-    refreshBtn.textContent = '↻ REFRESH';
-  }
-};
-
-document.addEventListener('visibilitychange', () => { 
-  if (document.visibilityState === 'visible') {
-    // Wait 500ms for phone antenna to reconnect before fetching
-    setTimeout(triggerAutoRefresh, 500); 
-  } else {
-    // If user backgrounds the app mid-drag, kill the drag so it doesn't get stuck
-    if (dragState) {
-      dragState.el.classList.remove('dragging');
-      dragState = null;
-    }
-  }
-});
-
-// Extra fallback for mobile browsers
-window.addEventListener('focus', () => {
-  setTimeout(triggerAutoRefresh, 500);
-});
-
-// 30 SECOND BACKGROUND POLLING
-setInterval(async () => {
-  if (!editingPosId && !dragState && document.visibilityState === 'visible') {
-    refreshBtn.textContent = '↻ AUTO...';
-    await loadFromCloud();
-    refreshBtn.textContent = '↻ REFRESH';
-  }
-}, 30000); 
-
-// --- UI AND DRAG LOGIC ---
 function drawOval(){
   ground.querySelectorAll('svg.bg,.divider').forEach(e=>e.remove());
   const w=ground.clientWidth,h=ground.clientHeight;
-  const cx=w/2,cy=h*0.38,rx=w*0.46,ry=h*0.37;
+  
+  /* Audit Anchor: cx: 50%, cy: 38% */
+  const cx=w*0.5, cy=h*0.38, rx=w*0.46, ry=h*0.37, sq=w*0.42; 
+
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
   svg.classList.add('bg');svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
+  const lineCol = "rgba(255,255,255,0.4)", strokeW = "3.5"; 
   
   svg.innerHTML=`
-    <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2"/>
-    <ellipse cx="${cx}" cy="${cy}" rx="${rx*0.55}" ry="${ry*0.40}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-    <rect x="${cx-18}" y="${cy-ry-1}" width="36" height="18" rx="2" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="1.5"/>
-    <rect x="${cx-18}" y="${cy+ry-17}" width="36" height="18" rx="2" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="1.5"/>
-    <line x1="${cx-rx}" y1="${cy}" x2="${cx+rx}" y2="${cy}" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>`;
+    <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
+    
+    <rect x="${cx-18}" y="${cy-ry-1}" width="36" height="18" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
+    
+    <rect x="${cx-18}" y="${cy+ry-17}" width="36" height="18" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
+    
+    <rect x="${cx - sq/2}" y="${cy - sq/2}" width="${sq}" height="${sq}" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
+    
+    <image href="https://aflnational.com/wp-content/uploads/2025/12/UNSW-Eastern-Suburbs-Bulldogs-AFL-footy-club-logo.png" x="${cx - 40}" y="${cy - 40}" height="80" width="80" />
+  `;
   ground.prepend(svg);
+
   const div=document.createElement('div');div.className='divider';div.style.top='78%';ground.appendChild(div);
   const lbl=document.createElement('div');lbl.className='zone-label';lbl.style.top='78.5%';lbl.textContent='INTERCHANGE';ground.appendChild(lbl);
   const emgLbl=document.createElement('div');emgLbl.className='zone-label right-aligned';emgLbl.style.top='78.5%';emgLbl.textContent='EMERGENCY';ground.appendChild(emgLbl);
@@ -302,31 +206,44 @@ function renderAll(){
   ground.querySelectorAll('.zone-label,.pos-slot,.magnet,.divider').forEach(e=>e.remove());
   drawOval();
   zones.forEach(z=>{const el=document.createElement('div');el.className='zone-label';el.style.top=z.y+'%';el.textContent=z.label;ground.appendChild(el)});
+  
+  const activeNames = [];
+  positions.forEach(p => {
+    const data = roster[p.id];
+    const name = typeof data === 'object' ? data.name : data;
+    if(name) activeNames.push({id: p.id, name: name.toLowerCase().trim()});
+  });
+
+  const warningIds = new Set();
+  activeNames.forEach(playerA => {
+    activeNames.forEach(playerB => {
+      if (playerA.id === playerB.id) return;
+      if (playerB.name.includes(playerA.name) || playerA.name.includes(playerB.name)) {
+        warningIds.add(playerA.id); warningIds.add(playerB.id);
+      }
+    });
+  });
+
   positions.forEach(p=>{
-    const name=roster[p.id];
+    const data=roster[p.id];
+    const name = typeof data === 'object' ? data.name : data;
+    const badge = typeof data === 'object' ? data.badge : '';
     const slot=document.createElement('div');
     slot.className='pos-slot'+(name?' filled':'');
     slot.style.left=p.x+'%';slot.style.top=p.y+'%';
     if(!name){slot.innerHTML=`<span class="pos-label">${p.label}</span>`;slot.addEventListener('click',()=>openEdit(p.id))}
     ground.appendChild(slot);
     if(name){
-      const mag=document.createElement('div');mag.className='magnet';mag.style.left=p.x+'%';mag.style.top=p.y+'%';
-      mag.textContent=name;mag.dataset.posId=p.id;
-      
+      const mag=document.createElement('div');
+      mag.className='magnet' + (warningIds.has(p.id) ? ' warning' : '');
+      mag.style.left=p.x+'%';mag.style.top=p.y+'%';
+      mag.innerHTML = `<div class="mag-badge">${badge || ''}</div><div class="mag-name">${name}</div>`;
+      mag.dataset.posId=p.id;
       mag.addEventListener('pointerdown', e => {
         if (!e.isPrimary || e.button !== 0) return; 
-        
-        e.preventDefault();
-        mag.setPointerCapture(e.pointerId); 
-        
+        e.preventDefault(); mag.setPointerCapture(e.pointerId); 
         const gR=ground.getBoundingClientRect();
-        dragState={
-          el:mag, posId:p.id, moved:false, pointerId: e.pointerId,
-          startX: e.clientX, startY: e.clientY,
-          offX:e.clientX-(gR.left+(p.x/100)*gR.width), 
-          offY:e.clientY-(gR.top+(p.y/100)*gR.height),
-          curX:p.x, curY:p.y
-        };
+        dragState={el:mag, posId:p.id, moved:false, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, offX:e.clientX-(gR.left+(p.x/100)*gR.width), offY:e.clientY-(gR.top+(p.y/100)*gR.height), curX:p.x, curY:p.y};
       });
       ground.appendChild(mag);
     }
@@ -335,15 +252,8 @@ function renderAll(){
 
 const onMove = (e) => {
   if(!dragState || dragState.pointerId !== e.pointerId) return;
-  
-  const dx = e.clientX - dragState.startX;
-  const dy = e.clientY - dragState.startY;
-  
-  if(!dragState.moved && (dx * dx + dy * dy > 225)) { 
-    dragState.moved = true; 
-    dragState.el.classList.add('dragging');
-  }
-
+  const dx = e.clientX - dragState.startX, dy = e.clientY - dragState.startY;
+  if(!dragState.moved && (dx * dx + dy * dy > 225)) { dragState.moved = true; dragState.el.classList.add('dragging');}
   if (dragState.moved) {
     const gR=ground.getBoundingClientRect();
     const x=((e.clientX-dragState.offX-gR.left)/gR.width)*100,y=((e.clientY-dragState.offY-gR.top)/gR.height)*100;
@@ -354,82 +264,42 @@ const onMove = (e) => {
 
 const onEnd = (e) => {
   if(!dragState || dragState.pointerId !== e.pointerId) return;
-  
   dragState.el.classList.remove('dragging');
   dragState.el.releasePointerCapture(e.pointerId);
-  
-  const ds=dragState;
-  dragState=null;
-  
-  if(!ds.moved){
-    openEdit(ds.posId);
-    return;
-  }
-  
+  const ds=dragState; dragState=null;
+  if(!ds.moved){ openEdit(ds.posId); return; }
   let best=null, bd=Infinity;
-  
-  positions.forEach(p => {
-    const dx = ds.curX - p.x;
-    const dy = ds.curY - p.y;
-    const d = dx*dx + dy*dy;
-    if(d < bd){ bd = d; best = p; }
-  });
-  
+  positions.forEach(p => {const dx = ds.curX - p.x, dy = ds.curY - p.y, d = dx*dx + dy*dy; if(d < bd){ bd = d; best = p; }});
   if(best && bd < 400){
-    const draggedName = roster[ds.posId];
-    
-    if(roster[best.id]){
-      roster[ds.posId] = roster[best.id];
-    } else {
-      delete roster[ds.posId];
-    }
-    
-    roster[best.id] = draggedName;
+    const draggedData = roster[ds.posId];
+    if(roster[best.id]){ roster[ds.posId] = roster[best.id]; } else { delete roster[ds.posId]; }
+    roster[best.id] = draggedData;
   }
-  
-  saveToCloud();
-  renderAll();
+  saveToCloud(); renderAll();
 };
 
 document.addEventListener('pointermove', onMove);
 document.addEventListener('pointerup', onEnd);
 document.addEventListener('pointercancel', onEnd); 
 
-// --- EDIT MENU LOGIC ---
-function openEdit(posId){editingPosId=posId;const p=positions.find(x=>x.id===posId);editTitle.textContent=p.label;editInput.value=roster[posId]||'';overlay.classList.add('show');setTimeout(()=>{editInput.focus();editInput.select()},50)}
+function openEdit(posId){
+  editingPosId=posId;
+  const data = roster[posId];
+  editTitle.textContent=positions.find(x=>x.id===posId).label;
+  editInput.value = typeof data === 'object' ? data.name : (data || '');
+  badgeInput.value = typeof data === 'object' ? data.badge : '';
+  overlay.classList.add('show');
+  setTimeout(()=>{editInput.focus();editInput.select()},50);
+}
 function closeEdit(){overlay.classList.remove('show');editingPosId=null}
-
 editSave.addEventListener('click',()=>{
-  const v = editInput.value.trim();
-  const oldName = roster[editingPosId];
-  
-  if (oldName && oldName.toLowerCase().trim() !== v.toLowerCase()) {
-    recentlyCleared.add(oldName.toLowerCase().trim());
-  }
-  
-  if(v) roster[editingPosId] = v;
-  else {
-    if(oldName) recentlyCleared.add(oldName.toLowerCase().trim());
-    delete roster[editingPosId];
-  }
-  
-  saveToCloud();
-  renderAll();
-  closeEdit();
+  const name = editInput.value.trim(), badge = badgeInput.value.trim();
+  if(name) roster[editingPosId] = { name, badge };
+  else delete roster[editingPosId];
+  saveToCloud(); renderAll(); closeEdit();
 });
-
-editClear.addEventListener('click',()=>{
-  const oldName = roster[editingPosId];
-  if(oldName) recentlyCleared.add(oldName.toLowerCase().trim());
-  
-  delete roster[editingPosId];
-  saveToCloud();
-  renderAll();
-  closeEdit();
-});
-
+editClear.addEventListener('click',()=>{ delete roster[editingPosId]; saveToCloud(); renderAll(); closeEdit();});
 editCancel.addEventListener('click',closeEdit);
-overlay.addEventListener('click',e=>{if(e.target===overlay)closeEdit()});
 editInput.addEventListener('keydown',e=>{if(e.key==='Enter')editSave.click()});
 
 loadFromCloud();
