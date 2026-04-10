@@ -12,16 +12,20 @@
   
   #app{
     height:100dvh; width:100vw; position:relative; overflow:hidden;
+    /* Deep blue base with broadcast textures */
     background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 20%, rgba(0,0,0,0.6) 100%),
                 repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0px, rgba(255,255,255,0.04) 2px, transparent 2px, transparent 14px),
                 #073175; 
     display:flex; align-items:center; justify-content:center;
+    padding: 0 10px; /* NEW: Global side padding for mobile safety */
   }
   
   #ground{
     position:relative; 
-    width:100%; max-width:550px; 
+    width:calc(100% - 20px); /* NEW: Accounts for padding */
+    max-width:550px; 
     height:100%; max-height:900px;
+    display: flex; align-items: center; justify-content: center;
   }
   
   #ground svg.bg{position:absolute;inset:0;width:100%;height:100%;z-index:1;}
@@ -50,7 +54,7 @@
     width:28px; height:28px; background:#6786b8; 
     border-radius:50%; border:2px solid #ffffff; 
     display:flex; justify-content:center; align-items:center;
-    font-size:12px; color:#fff; font-weight:800; box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    color:#fff; font-weight:700; box-shadow: 2px 0 5px rgba(0,0,0,0.1);
   }
   
   #editOverlay{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.65);align-items:center;justify-content:center;backdrop-filter:blur(2px);}
@@ -109,23 +113,16 @@ const syncStatus = document.getElementById('syncStatus'),
       editCancel=document.getElementById('editCancel');
 
 const positions=[
-  /* Forwardline */
   {id:'fpl',x:22,y:6,label:'FP'},{id:'ff',x:50,y:4,label:'FF'},{id:'fpr',x:78,y:6,label:'FP'},
   {id:'hfl',x:18,y:17,label:'HF'},{id:'chf',x:50,y:15,label:'CHF'},{id:'hfr',x:82,y:17,label:'HF'},
-  
-  /* Midfield - Anchored around Y: 38% Centre */
-  {id:'lw',x:2,y:36,label:'LW'}, 
+  {id:'lw',x:4,y:36,label:'LW'}, /* NEW: Shifted slightly in from 2% to 4% for screen safety */
   {id:'ml',x:26,y:36,label:'MID'}, 
-  {id:'c',x:50,y:26,label:'C'},
+  {id:'c',x:50,y:26,label:'C'}, 
   {id:'rk',x:50,y:46,label:'RK'}, 
   {id:'mr',x:74,y:36,label:'MID'}, 
-  {id:'rw',x:98,y:36,label:'RW'}, 
-  
-  /* Defence - Flipped symmetry (Base baseline is roughly 76% Y) */
+  {id:'rw',x:96,y:36,label:'RW'}, /* NEW: Shifted slightly in from 98% to 96% */
   {id:'hbl',x:18,y:59,label:'HB'},{id:'chb',x:50,y:61,label:'CHB'},{id:'hbr',x:82,y:59,label:'HB'},
   {id:'bpl',x:22,y:70,label:'BP'},{id:'fb',x:50,y:72,label:'FB'},{id:'bpr',x:78,y:70,label:'BP'},
-  
-  /* Bench */
   {id:'ic1',x:14,y:82,label:'IC'},{id:'ic2',x:32,y:82,label:'IC'},{id:'ic3',x:50,y:82,label:'IC'},{id:'ic4',x:68,y:82,label:'IC'},{id:'emg',x:86,y:82,label:'EMG'},
   {id:'e1',x:14,y:89,label:'---'},{id:'e2',x:32,y:89,label:'---'},{id:'e3',x:50,y:89,label:'---'},{id:'e4',x:68,y:89,label:'---'},{id:'e5',x:86,y:89,label:'---'},
   {id:'e6',x:14,y:96,label:'---'},{id:'e7',x:32,y:96,label:'---'},{id:'e8',x:50,y:96,label:'---'},{id:'e9',x:68,y:96,label:'---'},{id:'e10',x:86,y:96,label:'---'},
@@ -142,8 +139,7 @@ async function loadFromCloud(){
   try{
     syncStatus.textContent='syncing…';
     const res = await fetch(`${JSONBIN_URL}/latest?_t=${Date.now()}`, {
-      headers: { 'X-Master-Key': API_KEY },
-      cache: 'no-store' 
+      headers: { 'X-Master-Key': API_KEY }, cache: 'no-store' 
     });
     if(res.ok){
       const data = await res.json();
@@ -151,7 +147,10 @@ async function loadFromCloud(){
       localStorage.setItem('afl_roster', JSON.stringify(roster));
       syncStatus.textContent='synced';
     }
-  }catch(e){syncStatus.textContent='offline'}
+  }catch(e){
+    syncStatus.textContent='offline';
+    roster = JSON.parse(localStorage.getItem('afl_roster') || '{}');
+  }
   renderAll();
 }
 
@@ -171,32 +170,27 @@ function saveToCloud(){
   },500);
 }
 
+document.addEventListener('visibilitychange', () => { 
+  if (document.visibilityState === 'visible') setTimeout(loadFromCloud, 500); 
+});
+
 refreshBtn.addEventListener('click', loadFromCloud);
 
 function drawOval(){
   ground.querySelectorAll('svg.bg,.divider').forEach(e=>e.remove());
   const w=ground.clientWidth,h=ground.clientHeight;
-  
-  /* Audit Anchor: cx: 50%, cy: 38% */
   const cx=w*0.5, cy=h*0.38, rx=w*0.46, ry=h*0.37, sq=w*0.42; 
-
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
   svg.classList.add('bg');svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
   const lineCol = "rgba(255,255,255,0.4)", strokeW = "3.5"; 
-  
   svg.innerHTML=`
     <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
-    
     <rect x="${cx-18}" y="${cy-ry-1}" width="36" height="18" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
-    
     <rect x="${cx-18}" y="${cy+ry-17}" width="36" height="18" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
-    
     <rect x="${cx - sq/2}" y="${cy - sq/2}" width="${sq}" height="${sq}" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
-    
     <image href="https://aflnational.com/wp-content/uploads/2025/12/UNSW-Eastern-Suburbs-Bulldogs-AFL-footy-club-logo.png" x="${cx - 40}" y="${cy - 40}" height="80" width="80" />
   `;
   ground.prepend(svg);
-
   const div=document.createElement('div');div.className='divider';div.style.top='78%';ground.appendChild(div);
   const lbl=document.createElement('div');lbl.className='zone-label';lbl.style.top='78.5%';lbl.textContent='INTERCHANGE';ground.appendChild(lbl);
   const emgLbl=document.createElement('div');emgLbl.className='zone-label right-aligned';emgLbl.style.top='78.5%';emgLbl.textContent='EMERGENCY';ground.appendChild(emgLbl);
@@ -206,28 +200,20 @@ function renderAll(){
   ground.querySelectorAll('.zone-label,.pos-slot,.magnet,.divider').forEach(e=>e.remove());
   drawOval();
   zones.forEach(z=>{const el=document.createElement('div');el.className='zone-label';el.style.top=z.y+'%';el.textContent=z.label;ground.appendChild(el)});
-  
   const activeNames = [];
   positions.forEach(p => {
-    const data = roster[p.id];
-    const name = typeof data === 'object' ? data.name : data;
+    const data = roster[p.id], name = typeof data === 'object' ? data.name : data;
     if(name) activeNames.push({id: p.id, name: name.toLowerCase().trim()});
   });
-
   const warningIds = new Set();
   activeNames.forEach(playerA => {
     activeNames.forEach(playerB => {
       if (playerA.id === playerB.id) return;
-      if (playerB.name.includes(playerA.name) || playerA.name.includes(playerB.name)) {
-        warningIds.add(playerA.id); warningIds.add(playerB.id);
-      }
+      if (playerB.name.includes(playerA.name) || playerA.name.includes(playerB.name)) { warningIds.add(playerA.id); warningIds.add(playerB.id); }
     });
   });
-
   positions.forEach(p=>{
-    const data=roster[p.id];
-    const name = typeof data === 'object' ? data.name : data;
-    const badge = typeof data === 'object' ? data.badge : '';
+    const data=roster[p.id], name = typeof data === 'object' ? data.name : data, badge = typeof data === 'object' ? data.badge : '';
     const slot=document.createElement('div');
     slot.className='pos-slot'+(name?' filled':'');
     slot.style.left=p.x+'%';slot.style.top=p.y+'%';
@@ -237,7 +223,8 @@ function renderAll(){
       const mag=document.createElement('div');
       mag.className='magnet' + (warningIds.has(p.id) ? ' warning' : '');
       mag.style.left=p.x+'%';mag.style.top=p.y+'%';
-      mag.innerHTML = `<div class="mag-badge">${badge || ''}</div><div class="mag-name">${name}</div>`;
+      const badgeFontSize = (badge && badge.length === 1) ? '18px' : '14px';
+      mag.innerHTML = `<div class="mag-badge" style="font-size: ${badgeFontSize}">${badge || ''}</div><div class="mag-name">${name}</div>`;
       mag.dataset.posId=p.id;
       mag.addEventListener('pointerdown', e => {
         if (!e.isPrimary || e.button !== 0) return; 
@@ -253,7 +240,7 @@ function renderAll(){
 const onMove = (e) => {
   if(!dragState || dragState.pointerId !== e.pointerId) return;
   const dx = e.clientX - dragState.startX, dy = e.clientY - dragState.startY;
-  if(!dragState.moved && (dx * dx + dy * dy > 225)) { dragState.moved = true; dragState.el.classList.add('dragging');}
+  if(!dragState.moved && (dx * dx + dy * dy > 225)) { dragState.moved = true; dragState.el.classList.add('dragging'); }
   if (dragState.moved) {
     const gR=ground.getBoundingClientRect();
     const x=((e.clientX-dragState.offX-gR.left)/gR.width)*100,y=((e.clientY-dragState.offY-gR.top)/gR.height)*100;
