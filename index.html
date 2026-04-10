@@ -49,9 +49,12 @@
   </div>
 </div>
 <script>
-const NPOINT_URL = 'https://api.npoint.io/562a9a4512fe055853b3';
-const syncStatus = document.getElementById('syncStatus');
+// --- JSONBIN CONFIGURATION ---
+const BIN_ID = '69d861b7aaba882197e1984b';
+const API_KEY = '$2a$10$pzhEn9dwvvZP9ycmWjqIqOxQXIwhs.wWSOnj6BZv5SltQmU.XKXR6'; // <--- PASTE YOUR MASTER KEY HERE
+const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
+const syncStatus = document.getElementById('syncStatus');
 const ground=document.getElementById('ground'),overlay=document.getElementById('editOverlay'),editTitle=document.getElementById('editTitle'),editInput=document.getElementById('editInput'),editSave=document.getElementById('editSave'),editClear=document.getElementById('editClear'),editCancel=document.getElementById('editCancel');
 
 const positions=[
@@ -79,14 +82,17 @@ const zones=[{label:'FORWARD',y:9.5},{label:'MIDFIELD',y:29},{label:'DEFENCE',y:
 let roster={};
 let saveTimer=null;
 
+// --- UPDATED CLOUD LOGIC ---
 async function loadFromCloud(){
   try{
     syncStatus.textContent='syncing…';
-    const res=await fetch(NPOINT_URL);
+    const res = await fetch(`${JSONBIN_URL}/latest`, {
+      headers: { 'X-Master-Key': API_KEY }
+    });
     if(res.ok){
-      const data=await res.json();
-      roster=data||{};
-      localStorage.setItem('afl_roster',JSON.stringify(roster));
+      const data = await res.json();
+      roster = data.record || {}; 
+      localStorage.setItem('afl_roster', JSON.stringify(roster));
       syncStatus.textContent='synced';
     }else{
       syncStatus.textContent='error '+res.status;
@@ -105,10 +111,13 @@ function saveToCloud(){
   saveTimer=setTimeout(async()=>{
     try{
       syncStatus.textContent='saving…';
-      const res=await fetch(NPOINT_URL,{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(roster)
+      const res = await fetch(JSONBIN_URL, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Master-Key': API_KEY
+        },
+        body: JSON.stringify(roster)
       });
       if(res.ok){syncStatus.textContent='saved'}
       else{syncStatus.textContent='error '+res.status}
@@ -116,6 +125,7 @@ function saveToCloud(){
   },500);
 }
 
+// --- UI AND DRAG LOGIC ---
 function drawOval(){
   ground.querySelectorAll('svg.bg,.divider').forEach(e=>e.remove());
   const w=ground.clientWidth,h=ground.clientHeight;
