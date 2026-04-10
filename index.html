@@ -49,13 +49,7 @@
   </div>
 </div>
 <script>
-// ═══════════════════════════════════════════
-//  PASTE YOUR NPOINT BIN ID HERE
-// ═══════════════════════════════════════════
-const NPOINT_ID = '562a9a4512fe055853b3';
-// ═══════════════════════════════════════════
-
-const NPOINT_URL = `https://api.npoint.io/${NPOINT_ID}`;
+const NPOINT_URL = 'https://api.npoint.io/562a9a4512fe055853b3';
 const syncStatus = document.getElementById('syncStatus');
 
 const ground=document.getElementById('ground'),overlay=document.getElementById('editOverlay'),editTitle=document.getElementById('editTitle'),editInput=document.getElementById('editInput'),editSave=document.getElementById('editSave'),editClear=document.getElementById('editClear'),editCancel=document.getElementById('editCancel');
@@ -85,12 +79,19 @@ const zones=[{label:'FORWARD',y:9.5},{label:'MIDFIELD',y:29},{label:'DEFENCE',y:
 let roster={};
 let saveTimer=null;
 
-// ── Cloud sync ──
 async function loadFromCloud(){
   try{
     syncStatus.textContent='syncing…';
     const res=await fetch(NPOINT_URL);
-    if(res.ok){roster=await res.json()||{};localStorage.setItem('afl_roster',JSON.stringify(roster));syncStatus.textContent='synced'}
+    if(res.ok){
+      const data=await res.json();
+      roster=data||{};
+      localStorage.setItem('afl_roster',JSON.stringify(roster));
+      syncStatus.textContent='synced';
+    }else{
+      syncStatus.textContent='error '+res.status;
+      roster=JSON.parse(localStorage.getItem('afl_roster')||'{}');
+    }
   }catch(e){
     roster=JSON.parse(localStorage.getItem('afl_roster')||'{}');
     syncStatus.textContent='offline';
@@ -100,13 +101,17 @@ async function loadFromCloud(){
 
 function saveToCloud(){
   localStorage.setItem('afl_roster',JSON.stringify(roster));
-  // Debounce cloud saves to avoid hammering
   clearTimeout(saveTimer);
   saveTimer=setTimeout(async()=>{
     try{
       syncStatus.textContent='saving…';
-      await fetch(NPOINT_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(roster)});
-      syncStatus.textContent='saved';
+      const res=await fetch(NPOINT_URL,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(roster)
+      });
+      if(res.ok){syncStatus.textContent='saved'}
+      else{syncStatus.textContent='error '+res.status}
     }catch(e){syncStatus.textContent='offline'}
   },500);
 }
@@ -180,7 +185,6 @@ editCancel.addEventListener('click',closeEdit);
 overlay.addEventListener('click',e=>{if(e.target===overlay)closeEdit()});
 editInput.addEventListener('keydown',e=>{if(e.key==='Enter')editSave.click()});
 
-// Boot: load from cloud, fall back to localStorage
 loadFromCloud();
 window.addEventListener('resize',renderAll);
 </script>
