@@ -23,7 +23,6 @@
     position:relative; 
     width:100%; max-width:540px;
     height:100%; max-height:880px;
-    /* This ensures the whole field scales as one unit */
     display: flex; align-items: center; justify-content: center;
   }
   
@@ -33,10 +32,10 @@
   .zone-label.right-aligned{left:82%;transform:translateX(-50%)}
   .divider{position:absolute;left:5%;width:90%;height:1.5px;background:rgba(255,255,255,0.15);z-index:2;pointer-events:none}
   
-  /* UPSIZED Magnets */
+  /* SKINNER MAGNETS */
   .pos-slot, .magnet {
     position:absolute; transform:translate(-50%,-50%); z-index:3;
-    width:100px; height:32px; border-radius:3px;
+    width:90px; height:26px; border-radius:3px;
   }
 
   .pos-slot{ border:1px dashed rgba(255,255,255,0.25); display:flex; align-items:center; justify-content:center; cursor:pointer; background:rgba(255,255,255,0.02); }
@@ -45,20 +44,20 @@
   
   .magnet{
     z-index:50; background:#ffffff; color:#073175; 
-    font-family:'Barlow Condensed', sans-serif; font-weight:700; font-size:14px;
-    display:flex; align-items:center; padding:0 4px 0 28px; 
+    font-family:'Barlow Condensed', sans-serif; font-weight:700; font-size:12.5px;
+    display:flex; align-items:center; padding:0 4px 0 22px; 
     cursor:grab; box-shadow:0 4px 10px rgba(0,0,0,0.35); white-space:nowrap;
     transition: color 0.3s ease;
   }
   .magnet.dragging{ box-shadow:0 12px 24px rgba(0,0,0,0.6); z-index:200; opacity:0.98; }
   .magnet.warning { color: #c00000 !important; }
 
-  /* Bench - Slightly more compact but still larger than before */
-  .is-bench { width: 82px !important; font-size: 12px !important; padding-left: 24px !important; }
+  /* Bench - Scaled down to match new width */
+  .is-bench { width: 78px !important; font-size: 11px !important; padding-left: 20px !important; }
 
   .mag-badge {
-    position:absolute; left:-14px; top:50%; transform:translateY(-50%);
-    width:28px; height:28px; background:#6786b8; 
+    position:absolute; left:-12px; top:50%; transform:translateY(-50%);
+    width:24px; height:24px; background:#6786b8; 
     border-radius:50%; border:2px solid #ffffff; 
     display:flex; justify-content:center; align-items:center;
     color:#fff; font-weight:700; box-shadow: 1px 0 4px rgba(0,0,0,0.2);
@@ -68,7 +67,6 @@
   #refreshBtn{position:absolute;top:10px;left:10px;z-index:100;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.1);color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:12px;padding:6px 10px;border-radius:6px;cursor:pointer;letter-spacing:1px;}
   #syncStatus{position:absolute;top:10px;right:10px;z-index:100;font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:1px}
 
-  /* POPUP STYLES */
   #editOverlay{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;backdrop-filter:blur(4px);}
   #editOverlay.show{display:flex}
   #editBox{background:#111827;border-radius:14px;padding:24px;width:300px;display:flex;flex-direction:column;gap:15px;border:1px solid #374151;box-shadow: 0 20px 50px rgba(0,0,0,0.5);}
@@ -81,16 +79,9 @@
   #editBox .save-btn{background:#3b82f6;color:#fff}
   #editBox .clear-btn{background:#374151;color:#fff}
   
-  /* NEW SCALE LOGIC FOR MOBILE */
-  @media (max-width: 500px) {
-    #ground { transform: scale(0.9); }
-  }
-  @media (max-width: 420px) {
-    #ground { transform: scale(0.82); }
-  }
-  @media (max-width: 370px) {
-    #ground { transform: scale(0.75); }
-  }
+  @media (max-width: 500px) { #ground { transform: scale(0.9); } }
+  @media (max-width: 420px) { #ground { transform: scale(0.82); } }
+  @media (max-width: 370px) { #ground { transform: scale(0.75); } }
 </style>
 </head>
 <body>
@@ -178,12 +169,13 @@ function drawOval(){
     <rect x="${cx-18}" y="${cy-ry-1}" width="36" height="18" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
     <rect x="${cx-18}" y="${cy+ry-17}" width="36" height="18" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
     <rect x="${cx - sq/2}" y="${cy - sq/2}" width="${sq}" height="${sq}" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
-    <image href="https://aflnational.com/wp-content/uploads/2025/12/UNSW-Eastern-Suburbs-Bulldogs-AFL-footy-club-logo.png" x="${cx - 30}" y="${cy - 30}" height="60" width="60" />
+    <image href="https://aflnational.com/wp-content/uploads/2025/12/UNSW-Eastern-Suburbs-Bulldogs-AFL-footy-club-logo.png" x="${cx - 30}" y="${cy - 30}" height="80" width="80" />
   `;
   ground.prepend(svg);
   const div=document.createElement('div');div.className='divider';div.style.top='79%';ground.appendChild(div);
-  const lbl=document.createElement('div');lbl.className='zone-label';lbl.style.top='79.5%';lbl.textContent='INTERCHANGE';ground.appendChild(lbl);
-  const emgLbl=document.createElement('div');emgLbl.className='zone-label right-aligned';emgLbl.style.top='79.5%';emgLbl.textContent='EMERGENCY';ground.appendChild(emgLbl);
+  
+  const lbl=document.createElement('div');lbl.className='zone-label';lbl.style.top='77%';lbl.textContent='INTERCHANGE';ground.appendChild(lbl);
+  const emgLbl=document.createElement('div');emgLbl.className='zone-label right-aligned';emgLbl.style.top='77%';emgLbl.textContent='EMERGENCY';ground.appendChild(emgLbl);
 }
 
 function isEmoji(str) {
@@ -217,7 +209,7 @@ function renderAll(){
       const mag=document.createElement('div');
       mag.className='magnet' + (warningIds.has(p.id) ? ' warning' : '') + (p.bench?' is-bench':'');
       mag.style.left=p.x+'%';mag.style.top=p.y+'%';
-      let bFS = (isEmoji(badge) || badge.length === 1) ? '18px' : '15px';
+      let bFS = (isEmoji(badge) || badge.length === 1) ? '16px' : '13px';
       mag.innerHTML = `<div class="mag-badge" style="font-size:${bFS}">${badge||''}</div><div style="overflow:hidden;text-overflow:ellipsis">${name}</div>`;
       mag.onpointerdown=e=>{
         if(!e.isPrimary)return; e.preventDefault(); mag.setPointerCapture(e.pointerId);
