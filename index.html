@@ -19,7 +19,7 @@
   .pos-slot .pos-label{font-size:9px;color:rgba(255,255,255,0.25);text-transform:uppercase;letter-spacing:0.5px;pointer-events:none}
   .pos-slot.filled{border:none;pointer-events:none}
   .magnet{position:absolute;z-index:50;min-width:58px;height:30px;border-radius:6px;background:#e8c840;color:#111;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.3px;display:flex;align-items:center;justify-content:center;padding:0 8px;cursor:grab;box-shadow:0 2px 6px rgba(0,0,0,0.5);transform:translate(-50%,-50%);white-space:nowrap}
-  .magnet.dragging{box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:200;opacity:0.9}
+  .magnet.dragging{box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:200;opacity:0.9;cursor:grabbing}
   #editOverlay{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.55);align-items:center;justify-content:center}
   #editOverlay.show{display:flex}
   #editBox{background:#1a1a1a;border-radius:12px;padding:16px;width:260px;display:flex;flex-direction:column;gap:10px;box-shadow:0 12px 40px rgba(0,0,0,0.7);border:1px solid #333}
@@ -32,10 +32,15 @@
   #editBox .clear-btn{background:#333;color:#aaa}
   #editBox .cancel-btn{background:#222;color:#666}
   #syncStatus{position:fixed;top:8px;right:8px;z-index:100;font-size:10px;color:rgba(255,255,255,0.3);font-family:'Barlow Condensed',sans-serif;letter-spacing:1px}
+  
+  /* --- NEW REFRESH BUTTON STYLES --- */
+  #refreshBtn{position:fixed;top:8px;left:8px;z-index:100;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:#ccc;font-family:'Barlow Condensed',sans-serif;font-size:12px;padding:4px 10px;border-radius:6px;cursor:pointer;letter-spacing:1px;transition:all 0.2s;}
+  #refreshBtn:active{background:rgba(232,200,64,0.2);border-color:#e8c840;color:#e8c840;}
 </style>
 </head>
 <body>
 <div id="app"><div id="ground"></div></div>
+<button id="refreshBtn">↻ REFRESH</button>
 <div id="syncStatus"></div>
 <div id="editOverlay">
   <div id="editBox">
@@ -55,6 +60,7 @@ const API_KEY = '$2a$10$pzhEn9dwvvZP9ycmWjqIqOxQXIwhs.wWSOnj6BZv5SltQmU.XKXR6'; 
 const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
 const syncStatus = document.getElementById('syncStatus');
+const refreshBtn = document.getElementById('refreshBtn');
 const ground=document.getElementById('ground'),overlay=document.getElementById('editOverlay'),editTitle=document.getElementById('editTitle'),editInput=document.getElementById('editInput'),editSave=document.getElementById('editSave'),editClear=document.getElementById('editClear'),editCancel=document.getElementById('editCancel');
 
 const positions=[
@@ -125,6 +131,13 @@ function saveToCloud(){
   },500);
 }
 
+// --- REFRESH BUTTON LISTENER ---
+refreshBtn.addEventListener('click', async () => {
+  refreshBtn.textContent = '↻ REFRESHING...';
+  await loadFromCloud();
+  refreshBtn.textContent = '↻ REFRESH';
+});
+
 // --- UI AND DRAG LOGIC ---
 function drawOval(){
   ground.querySelectorAll('svg.bg,.divider').forEach(e=>e.remove());
@@ -162,47 +175,53 @@ function renderAll(){
       const mag=document.createElement('div');mag.className='magnet';mag.style.left=p.x+'%';mag.style.top=p.y+'%';
       mag.textContent=name;mag.dataset.posId=p.id;
       
-      const startDrag=(px,py,e)=>{
+      // Pointer down unified event
+      mag.addEventListener('pointerdown', e => {
+        if (!e.isPrimary || e.button !== 0) return; 
+        
         e.preventDefault();
+        mag.setPointerCapture(e.pointerId); 
+        
         const gR=ground.getBoundingClientRect();
         dragState={
-          el:mag, posId:p.id, moved:false, 
-          startX: px, startY: py,
-          offX:px-(gR.left+(p.x/100)*gR.width), 
-          offY:py-(gR.top+(p.y/100)*gR.height),
+          el:mag, posId:p.id, moved:false, pointerId: e.pointerId,
+          startX: e.clientX, startY: e.clientY,
+          offX:e.clientX-(gR.left+(p.x/100)*gR.width), 
+          offY:e.clientY-(gR.top+(p.y/100)*gR.height),
           curX:p.x, curY:p.y
         };
-      };
-      
-      mag.addEventListener('touchstart',e=>{const t=e.touches[0];startDrag(t.clientX,t.clientY,e)},{passive:false});
-      mag.addEventListener('mousedown',e=>startDrag(e.clientX,e.clientY,e));
+      });
       ground.appendChild(mag);
     }
   });
 }
 
-const onMove=(px,py)=>{
-  if(!dragState)return;
+const onMove = (e) => {
+  if(!dragState || dragState.pointerId !== e.pointerId) return;
   
-  const dx = px - dragState.startX;
-  const dy = py - dragState.startY;
+  const dx = e.clientX - dragState.startX;
+  const dy = e.clientY - dragState.startY;
   
-  if(!dragState.moved && (dx * dx + dy * dy > 25)) { 
+  // 15-pixel threshold so fat fingers don't register as drags
+  if(!dragState.moved && (dx * dx + dy * dy > 225)) { 
     dragState.moved = true; 
     dragState.el.classList.add('dragging');
   }
 
   if (dragState.moved) {
     const gR=ground.getBoundingClientRect();
-    const x=((px-dragState.offX-gR.left)/gR.width)*100,y=((py-dragState.offY-gR.top)/gR.height)*100;
+    const x=((e.clientX-dragState.offX-gR.left)/gR.width)*100,y=((e.clientY-dragState.offY-gR.top)/gR.height)*100;
     dragState.curX=Math.max(0,Math.min(100,x));dragState.curY=Math.max(0,Math.min(100,y));
     dragState.el.style.left=dragState.curX+'%';dragState.el.style.top=dragState.curY+'%';
   }
 };
 
-const onEnd=()=>{
-  if(!dragState)return;
+const onEnd = (e) => {
+  if(!dragState || dragState.pointerId !== e.pointerId) return;
+  
   dragState.el.classList.remove('dragging');
+  dragState.el.releasePointerCapture(e.pointerId);
+  
   const ds=dragState;
   dragState=null;
   
@@ -217,8 +236,9 @@ const onEnd=()=>{
   saveToCloud();renderAll()
 };
 
-document.addEventListener('touchmove',e=>{if(dragState){e.preventDefault();const t=e.touches[0];onMove(t.clientX,t.clientY)}},{passive:false});
-document.addEventListener('touchend',onEnd);document.addEventListener('mousemove',e=>onMove(e.clientX,e.clientY));document.addEventListener('mouseup',onEnd);
+document.addEventListener('pointermove', onMove);
+document.addEventListener('pointerup', onEnd);
+document.addEventListener('pointercancel', onEnd); 
 
 // --- EDIT MENU LOGIC ---
 let editingPosId=null;
