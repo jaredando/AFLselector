@@ -80,7 +80,7 @@
     </div>
     <ul>
       <li><span>📱</span> <b>Edit:</b> Hold down a player</li>
-      <li><span>🔄</span> <b>Collab:</b> Click refresh often</li>
+      <li><span>🔄</span> <b>Collab:</b> Auto-refreshes or click button</li>
       <li><span>🤏</span> <b>Swap:</b> Drag one onto another</li>
       <li><span>➕</span> <b>Add:</b> Tap an empty slot</li>
     </ul>
@@ -160,22 +160,54 @@ const zones=[{label:'FORWARD',y:9.5},{label:'MIDFIELD',y:29},{label:'DEFENCE',y:
 let roster={};
 let saveTimer=null;
 let editingPosId=null;
+let dragState=null; 
+let recentlyCleared = new Set(); // Tracks intentional deletions to prevent them being "rescued"
 
-// --- CLOUD LOGIC ---
+// --- CLOUD LOGIC WITH BENCH RESCUE ---
 async function loadFromCloud(){
   try{
     syncStatus.textContent='syncing…';
-    // ADDED cache: 'no-store' to stop mobile browsers from reusing old data
     const res = await fetch(`${JSONBIN_URL}/latest`, {
       headers: { 'X-Master-Key': API_KEY },
       cache: 'no-store' 
     });
+    
     if(res.ok){
       const data = await res.json();
-      roster = data.record || {}; 
+      const newRoster = data.record || {}; 
+      const oldRoster = JSON.parse(localStorage.getItem('afl_roster')||'{}');
+      
+      let rescued = false;
+      const remoteNames = Object.values(newRoster).map(n => n.toLowerCase().trim());
+
+      // SAFETY NET: Check for lost players
+      for (const [posId, name] of Object.entries(oldRoster)) {
+        if (!name) continue;
+        const normalized = name.toLowerCase().trim();
+
+        // If a player is missing from the cloud, AND we didn't just explicitly delete them...
+        if (!remoteNames.includes(normalized) && !recentlyCleared.has(normalized)) {
+          // Drop them into the first empty emergency slot
+          for (let i = 1; i <= 10; i++) {
+            const benchId = 'e' + i;
+            if (!newRoster[benchId]) {
+              newRoster[benchId] = name;
+              rescued = true;
+              break;
+            }
+          }
+        }
+      }
+
+      roster = newRoster;
       localStorage.setItem('afl_roster', JSON.stringify(roster));
       syncStatus.textContent='synced';
-    }else{
+      
+      // Clear the tracker and push rescues to cloud if needed
+      recentlyCleared.clear();
+      if (rescued) saveToCloud();
+      
+    } else {
       syncStatus.textContent='error '+res.status;
       roster=JSON.parse(localStorage.getItem('afl_roster')||'{}');
     }
@@ -213,22 +245,25 @@ refreshBtn.addEventListener('click', async () => {
   refreshBtn.textContent = '↻ REFRESH';
 });
 
-// --- BULLETPROOF AUTO REFRESH ---
+// Focus/Visibility Trigger
 const triggerAutoRefresh = async () => {
-  if (!editingPosId) {
+  if (!editingPosId && !dragState) {
     refreshBtn.textContent = '↻ REFRESHING...';
     await loadFromCloud();
     refreshBtn.textContent = '↻ REFRESH';
   }
 };
-
-// Fires when tab becomes visible (desktop mostly)
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') triggerAutoRefresh();
-});
-
-// Fires when window gets focus (mobile safari fallback)
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') triggerAutoRefresh(); });
 window.addEventListener('focus', triggerAutoRefresh);
+
+// --- 30 SECOND BACKGROUND POLLING ---
+setInterval(async () => {
+  if (!editingPosId && !dragState && document.visibilityState === 'visible') {
+    refreshBtn.textContent = '↻ AUTO...';
+    await loadFromCloud();
+    refreshBtn.textContent = '↻ REFRESH';
+  }
+}, 30000); 
 
 // --- UI AND DRAG LOGIC ---
 function drawOval(){
@@ -249,8 +284,6 @@ function drawOval(){
   const lbl=document.createElement('div');lbl.className='zone-label';lbl.style.top='78.5%';lbl.textContent='INTERCHANGE';ground.appendChild(lbl);
   const emgLbl=document.createElement('div');emgLbl.className='zone-label right-aligned';emgLbl.style.top='78.5%';emgLbl.textContent='EMERGENCY';ground.appendChild(emgLbl);
 }
-
-let dragState=null;
 
 function renderAll(){
   ground.querySelectorAll('.zone-label,.pos-slot,.magnet,.divider').forEach(e=>e.remove());
@@ -353,8 +386,36 @@ document.addEventListener('pointercancel', onEnd);
 function openEdit(posId){editingPosId=posId;const p=positions.find(x=>x.id===posId);editTitle.textContent=p.label;editInput.value=roster[posId]||'';overlay.classList.add('show');setTimeout(()=>{editInput.focus();editInput.select()},50)}
 function closeEdit(){overlay.classList.remove('show');editingPosId=null}
 
-editSave.addEventListener('click',()=>{const v=editInput.value.trim();if(v)roster[editingPosId]=v;else delete roster[editingPosId];saveToCloud();renderAll();closeEdit()});
-editClear.addEventListener('click',()=>{delete roster[editingPosId];saveToCloud();renderAll();closeEdit()});
+editSave.addEventListener('click',()=>{
+  const v = editInput.value.trim();
+  const oldName = roster[editingPosId];
+  
+  // Track intentional modifications so the safety net ignores them
+  if (oldName && oldName.toLowerCase().trim() !== v.toLowerCase()) {
+    recentlyCleared.add(oldName.toLowerCase().trim());
+  }
+  
+  if(v) roster[editingPosId] = v;
+  else {
+    if(oldName) recentlyCleared.add(oldName.toLowerCase().trim());
+    delete roster[editingPosId];
+  }
+  
+  saveToCloud();
+  renderAll();
+  closeEdit();
+});
+
+editClear.addEventListener('click',()=>{
+  const oldName = roster[editingPosId];
+  if(oldName) recentlyCleared.add(oldName.toLowerCase().trim());
+  
+  delete roster[editingPosId];
+  saveToCloud();
+  renderAll();
+  closeEdit();
+});
+
 editCancel.addEventListener('click',closeEdit);
 overlay.addEventListener('click',e=>{if(e.target===overlay)closeEdit()});
 editInput.addEventListener('keydown',e=>{if(e.key==='Enter')editSave.click()});
