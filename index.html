@@ -82,7 +82,7 @@ const zones=[{label:'FORWARD',y:9.5},{label:'MIDFIELD',y:29},{label:'DEFENCE',y:
 let roster={};
 let saveTimer=null;
 
-// --- UPDATED CLOUD LOGIC ---
+// --- CLOUD LOGIC ---
 async function loadFromCloud(){
   try{
     syncStatus.textContent='syncing…';
@@ -161,8 +161,19 @@ function renderAll(){
     if(name){
       const mag=document.createElement('div');mag.className='magnet';mag.style.left=p.x+'%';mag.style.top=p.y+'%';
       mag.textContent=name;mag.dataset.posId=p.id;
-      const startDrag=(px,py,e)=>{e.preventDefault();mag.classList.add('dragging');const gR=ground.getBoundingClientRect();
-        dragState={el:mag,posId:p.id,moved:false,offX:px-(gR.left+(p.x/100)*gR.width),offY:py-(gR.top+(p.y/100)*gR.height),curX:p.x,curY:p.y}};
+      
+      const startDrag=(px,py,e)=>{
+        e.preventDefault();
+        const gR=ground.getBoundingClientRect();
+        dragState={
+          el:mag, posId:p.id, moved:false, 
+          startX: px, startY: py,
+          offX:px-(gR.left+(p.x/100)*gR.width), 
+          offY:py-(gR.top+(p.y/100)*gR.height),
+          curX:p.x, curY:p.y
+        };
+      };
+      
       mag.addEventListener('touchstart',e=>{const t=e.touches[0];startDrag(t.clientX,t.clientY,e)},{passive:false});
       mag.addEventListener('mousedown',e=>startDrag(e.clientX,e.clientY,e));
       ground.appendChild(mag);
@@ -170,21 +181,46 @@ function renderAll(){
   });
 }
 
-const onMove=(px,py)=>{if(!dragState)return;dragState.moved=true;const gR=ground.getBoundingClientRect();
-  const x=((px-dragState.offX-gR.left)/gR.width)*100,y=((py-dragState.offY-gR.top)/gR.height)*100;
-  dragState.curX=Math.max(0,Math.min(100,x));dragState.curY=Math.max(0,Math.min(100,y));
-  dragState.el.style.left=dragState.curX+'%';dragState.el.style.top=dragState.curY+'%'};
+const onMove=(px,py)=>{
+  if(!dragState)return;
+  
+  const dx = px - dragState.startX;
+  const dy = py - dragState.startY;
+  
+  if(!dragState.moved && (dx * dx + dy * dy > 25)) { 
+    dragState.moved = true; 
+    dragState.el.classList.add('dragging');
+  }
 
-const onEnd=()=>{if(!dragState)return;dragState.el.classList.remove('dragging');const ds=dragState;dragState=null;
-  if(!ds.moved){openEdit(ds.posId);return}
+  if (dragState.moved) {
+    const gR=ground.getBoundingClientRect();
+    const x=((px-dragState.offX-gR.left)/gR.width)*100,y=((py-dragState.offY-gR.top)/gR.height)*100;
+    dragState.curX=Math.max(0,Math.min(100,x));dragState.curY=Math.max(0,Math.min(100,y));
+    dragState.el.style.left=dragState.curX+'%';dragState.el.style.top=dragState.curY+'%';
+  }
+};
+
+const onEnd=()=>{
+  if(!dragState)return;
+  dragState.el.classList.remove('dragging');
+  const ds=dragState;
+  dragState=null;
+  
+  if(!ds.moved){
+    openEdit(ds.posId);
+    return;
+  }
+  
   let best=null,bd=Infinity;
   positions.forEach(p=>{if(p.id===ds.posId||!roster[p.id]){const dx=ds.curX-p.x,dy=ds.curY-p.y,d=dx*dx+dy*dy;if(d<bd){bd=d;best=p}}});
   if(best&&bd<400){const name=roster[ds.posId];if(roster[best.id]){roster[ds.posId]=roster[best.id]}else{delete roster[ds.posId]}roster[best.id]=name}
-  saveToCloud();renderAll()};
+  saveToCloud();renderAll()
+};
 
 document.addEventListener('touchmove',e=>{if(dragState){e.preventDefault();const t=e.touches[0];onMove(t.clientX,t.clientY)}},{passive:false});
 document.addEventListener('touchend',onEnd);document.addEventListener('mousemove',e=>onMove(e.clientX,e.clientY));document.addEventListener('mouseup',onEnd);
 
+// --- EDIT MENU LOGIC ---
 let editingPosId=null;
 function openEdit(posId){editingPosId=posId;const p=positions.find(x=>x.id===posId);editTitle.textContent=p.label;editInput.value=roster[posId]||'';overlay.classList.add('show');setTimeout(()=>{editInput.focus();editInput.select()},50)}
 function closeEdit(){overlay.classList.remove('show');editingPosId=null}
