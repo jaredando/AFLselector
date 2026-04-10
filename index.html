@@ -31,10 +31,12 @@
   #editBox .save-btn{background:#e8c840;color:#111}
   #editBox .clear-btn{background:#333;color:#aaa}
   #editBox .cancel-btn{background:#222;color:#666}
+  #syncStatus{position:fixed;top:8px;right:8px;z-index:100;font-size:10px;color:rgba(255,255,255,0.3);font-family:'Barlow Condensed',sans-serif;letter-spacing:1px}
 </style>
 </head>
 <body>
 <div id="app"><div id="ground"></div></div>
+<div id="syncStatus"></div>
 <div id="editOverlay">
   <div id="editBox">
     <div class="edit-title" id="editTitle">FB</div>
@@ -47,6 +49,15 @@
   </div>
 </div>
 <script>
+// ═══════════════════════════════════════════
+//  PASTE YOUR NPOINT BIN ID HERE
+// ═══════════════════════════════════════════
+const NPOINT_ID = '562a9a4512fe055853b3';
+// ═══════════════════════════════════════════
+
+const NPOINT_URL = `https://api.npoint.io/${NPOINT_ID}`;
+const syncStatus = document.getElementById('syncStatus');
+
 const ground=document.getElementById('ground'),overlay=document.getElementById('editOverlay'),editTitle=document.getElementById('editTitle'),editInput=document.getElementById('editInput'),editSave=document.getElementById('editSave'),editClear=document.getElementById('editClear'),editCancel=document.getElementById('editCancel');
 
 const positions=[
@@ -71,8 +82,34 @@ const positions=[
 
 const zones=[{label:'FORWARD',y:9.5},{label:'MIDFIELD',y:29},{label:'DEFENCE',y:63.5}];
 
-let roster=JSON.parse(localStorage.getItem('afl_roster')||'{}');
-function save(){localStorage.setItem('afl_roster',JSON.stringify(roster))}
+let roster={};
+let saveTimer=null;
+
+// ── Cloud sync ──
+async function loadFromCloud(){
+  try{
+    syncStatus.textContent='syncing…';
+    const res=await fetch(NPOINT_URL);
+    if(res.ok){roster=await res.json()||{};localStorage.setItem('afl_roster',JSON.stringify(roster));syncStatus.textContent='synced'}
+  }catch(e){
+    roster=JSON.parse(localStorage.getItem('afl_roster')||'{}');
+    syncStatus.textContent='offline';
+  }
+  renderAll();
+}
+
+function saveToCloud(){
+  localStorage.setItem('afl_roster',JSON.stringify(roster));
+  // Debounce cloud saves to avoid hammering
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(async()=>{
+    try{
+      syncStatus.textContent='saving…';
+      await fetch(NPOINT_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(roster)});
+      syncStatus.textContent='saved';
+    }catch(e){syncStatus.textContent='offline'}
+  },500);
+}
 
 function drawOval(){
   ground.querySelectorAll('svg.bg,.divider').forEach(e=>e.remove());
@@ -128,7 +165,7 @@ const onEnd=()=>{if(!dragState)return;dragState.el.classList.remove('dragging');
   let best=null,bd=Infinity;
   positions.forEach(p=>{if(p.id===ds.posId||!roster[p.id]){const dx=ds.curX-p.x,dy=ds.curY-p.y,d=dx*dx+dy*dy;if(d<bd){bd=d;best=p}}});
   if(best&&bd<400){const name=roster[ds.posId];if(roster[best.id]){roster[ds.posId]=roster[best.id]}else{delete roster[ds.posId]}roster[best.id]=name}
-  save();renderAll()};
+  saveToCloud();renderAll()};
 
 document.addEventListener('touchmove',e=>{if(dragState){e.preventDefault();const t=e.touches[0];onMove(t.clientX,t.clientY)}},{passive:false});
 document.addEventListener('touchend',onEnd);document.addEventListener('mousemove',e=>onMove(e.clientX,e.clientY));document.addEventListener('mouseup',onEnd);
@@ -137,13 +174,15 @@ let editingPosId=null;
 function openEdit(posId){editingPosId=posId;const p=positions.find(x=>x.id===posId);editTitle.textContent=p.label;editInput.value=roster[posId]||'';overlay.classList.add('show');setTimeout(()=>{editInput.focus();editInput.select()},50)}
 function closeEdit(){overlay.classList.remove('show');editingPosId=null}
 
-editSave.addEventListener('click',()=>{const v=editInput.value.trim();if(v)roster[editingPosId]=v;else delete roster[editingPosId];save();renderAll();closeEdit()});
-editClear.addEventListener('click',()=>{delete roster[editingPosId];save();renderAll();closeEdit()});
+editSave.addEventListener('click',()=>{const v=editInput.value.trim();if(v)roster[editingPosId]=v;else delete roster[editingPosId];saveToCloud();renderAll();closeEdit()});
+editClear.addEventListener('click',()=>{delete roster[editingPosId];saveToCloud();renderAll();closeEdit()});
 editCancel.addEventListener('click',closeEdit);
 overlay.addEventListener('click',e=>{if(e.target===overlay)closeEdit()});
 editInput.addEventListener('keydown',e=>{if(e.key==='Enter')editSave.click()});
 
-renderAll();
+// Boot: load from cloud, fall back to localStorage
+loadFromCloud();
+window.addEventListener('resize',renderAll);
 </script>
 </body>
 </html>
