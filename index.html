@@ -60,22 +60,16 @@ const positions=[
   {id:'rw',x:92,y:36,label:'RW'},
   {id:'hbl',x:18,y:55,label:'HB'},{id:'chb',x:50,y:57,label:'CHB'},{id:'hbr',x:82,y:55,label:'HB'},
   {id:'bpl',x:22,y:68,label:'BP'},{id:'fb',x:50,y:70,label:'FB'},{id:'bpr',x:78,y:68,label:'BP'},
-  // Interchange: IC IC IC IC then EMG
   {id:'ic1',x:14,y:82,label:'IC'},{id:'ic2',x:32,y:82,label:'IC'},
   {id:'ic3',x:50,y:82,label:'IC'},{id:'ic4',x:68,y:82,label:'IC'},
   {id:'emg',x:86,y:82,label:'EMG'},
-  // Extra rows
   {id:'e1',x:14,y:89,label:'---'},{id:'e2',x:32,y:89,label:'---'},
   {id:'e3',x:50,y:89,label:'---'},{id:'e4',x:68,y:89,label:'---'},{id:'e5',x:86,y:89,label:'---'},
   {id:'e6',x:14,y:96,label:'---'},{id:'e7',x:32,y:96,label:'---'},
   {id:'e8',x:50,y:96,label:'---'},{id:'e9',x:68,y:96,label:'---'},{id:'e10',x:86,y:96,label:'---'},
 ];
 
-const zones=[
-  {label:'FORWARD',y:9.5},
-  {label:'MIDFIELD',y:29},
-  {label:'DEFENCE',y:63.5},
-];
+const zones=[{label:'FORWARD',y:9.5},{label:'MIDFIELD',y:29},{label:'DEFENCE',y:63.5}];
 
 let roster=JSON.parse(localStorage.getItem('afl_roster')||'{}');
 function save(){localStorage.setItem('afl_roster',JSON.stringify(roster))}
@@ -94,12 +88,8 @@ function drawOval(){
     <rect x="${cx-18}" y="${cy+ry-17}" width="36" height="18" rx="2" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="1.5"/>
     <line x1="${cx-rx}" y1="${cy}" x2="${cx+rx}" y2="${cy}" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>`;
   ground.prepend(svg);
-
-  // Interchange divider + label
   const div=document.createElement('div');div.className='divider';div.style.top='78%';ground.appendChild(div);
   const lbl=document.createElement('div');lbl.className='zone-label';lbl.style.top='78.5%';lbl.textContent='INTERCHANGE';ground.appendChild(lbl);
-
-  // Emergency label above EMG slot
   const emgLbl=document.createElement('div');emgLbl.className='zone-label right-aligned';emgLbl.style.top='78.5%';emgLbl.textContent='EMERGENCY';ground.appendChild(emgLbl);
 }
 
@@ -153,7 +143,7 @@ editCancel.addEventListener('click',closeEdit);
 overlay.addEventListener('click',e=>{if(e.target===overlay)closeEdit()});
 editInput.addEventListener('keydown',e=>{if(e.key==='Enter')editSave.click()});
 
-renderAll();window.addEventListener('resize',renderAll);
+renderAll();
 </script>
 </body>
 </html>
