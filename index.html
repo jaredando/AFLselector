@@ -161,13 +161,15 @@ let roster={};
 let saveTimer=null;
 let editingPosId=null;
 let dragState=null; 
-let recentlyCleared = new Set(); // Tracks intentional deletions to prevent them being "rescued"
+let recentlyCleared = new Set(); 
 
-// --- CLOUD LOGIC WITH BENCH RESCUE ---
+// --- CLOUD LOGIC WITH BENCH RESCUE & CACHE BUSTING ---
 async function loadFromCloud(){
   try{
     syncStatus.textContent='syncing…';
-    const res = await fetch(`${JSONBIN_URL}/latest`, {
+    
+    // ADDED: ?_t=${Date.now()} forces Android to bypass cache completely
+    const res = await fetch(`${JSONBIN_URL}/latest?_t=${Date.now()}`, {
       headers: { 'X-Master-Key': API_KEY },
       cache: 'no-store' 
     });
@@ -180,14 +182,11 @@ async function loadFromCloud(){
       let rescued = false;
       const remoteNames = Object.values(newRoster).map(n => n.toLowerCase().trim());
 
-      // SAFETY NET: Check for lost players
       for (const [posId, name] of Object.entries(oldRoster)) {
         if (!name) continue;
         const normalized = name.toLowerCase().trim();
 
-        // If a player is missing from the cloud, AND we didn't just explicitly delete them...
         if (!remoteNames.includes(normalized) && !recentlyCleared.has(normalized)) {
-          // Drop them into the first empty emergency slot
           for (let i = 1; i <= 10; i++) {
             const benchId = 'e' + i;
             if (!newRoster[benchId]) {
@@ -203,7 +202,6 @@ async function loadFromCloud(){
       localStorage.setItem('afl_roster', JSON.stringify(roster));
       syncStatus.textContent='synced';
       
-      // Clear the tracker and push rescues to cloud if needed
       recentlyCleared.clear();
       if (rescued) saveToCloud();
       
@@ -238,32 +236,47 @@ function saveToCloud(){
   },500);
 }
 
-// Manual Refresh
 refreshBtn.addEventListener('click', async () => {
   refreshBtn.textContent = '↻ REFRESHING...';
   await loadFromCloud();
   refreshBtn.textContent = '↻ REFRESH';
 });
 
-// Focus/Visibility Trigger
+// --- BULLETPROOF ANDROID WAKEUP TRIGGERS ---
 const triggerAutoRefresh = async () => {
   if (!editingPosId && !dragState) {
-    refreshBtn.textContent = '↻ REFRESHING...';
+    refreshBtn.textContent = '↻ AUTO...';
     await loadFromCloud();
     refreshBtn.textContent = '↻ REFRESH';
   }
 };
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') triggerAutoRefresh(); });
-window.addEventListener('focus', triggerAutoRefresh);
 
-// --- 15 SECOND BACKGROUND POLLING ---
+document.addEventListener('visibilitychange', () => { 
+  if (document.visibilityState === 'visible') {
+    // Wait 500ms for phone antenna to reconnect before fetching
+    setTimeout(triggerAutoRefresh, 500); 
+  } else {
+    // If user backgrounds the app mid-drag, kill the drag so it doesn't get stuck
+    if (dragState) {
+      dragState.el.classList.remove('dragging');
+      dragState = null;
+    }
+  }
+});
+
+// Extra fallback for mobile browsers
+window.addEventListener('focus', () => {
+  setTimeout(triggerAutoRefresh, 500);
+});
+
+// 30 SECOND BACKGROUND POLLING
 setInterval(async () => {
   if (!editingPosId && !dragState && document.visibilityState === 'visible') {
     refreshBtn.textContent = '↻ AUTO...';
     await loadFromCloud();
     refreshBtn.textContent = '↻ REFRESH';
   }
-}, 15000); 
+}, 30000); 
 
 // --- UI AND DRAG LOGIC ---
 function drawOval(){
@@ -390,7 +403,6 @@ editSave.addEventListener('click',()=>{
   const v = editInput.value.trim();
   const oldName = roster[editingPosId];
   
-  // Track intentional modifications so the safety net ignores them
   if (oldName && oldName.toLowerCase().trim() !== v.toLowerCase()) {
     recentlyCleared.add(oldName.toLowerCase().trim());
   }
