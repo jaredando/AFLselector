@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Team Sheet</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@500;600&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-user-select:none;user-select:none;touch-action:none}
+  html,body{height:100%;overflow:hidden;background:#0d2818;font-family:'Barlow Condensed',sans-serif}
+  #app{height:100dvh;width:100vw;position:relative;overflow:hidden}
+  #ground{position:absolute;inset:0;width:100%;height:100%}
+  #ground svg.bg{position:absolute;inset:0;width:100%;height:100%}
+  .zone-label{position:absolute;left:50%;transform:translateX(-50%);font-family:'Bebas Neue',sans-serif;font-size:13px;color:rgba(255,255,255,0.18);letter-spacing:3px;pointer-events:none;text-transform:uppercase;z-index:2}
+  .zone-label.right-aligned{left:86%;transform:translateX(-50%)}
+  .divider{position:absolute;left:10%;width:80%;height:1px;background:rgba(255,255,255,0.08);z-index:2;pointer-events:none}
+  .pos-slot{position:absolute;width:58px;height:30px;border-radius:6px;border:2px dashed rgba(255,255,255,0.18);transform:translate(-50%,-50%);z-index:3;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .pos-slot:active{border-color:rgba(232,200,64,0.5);background:rgba(232,200,64,0.08)}
+  .pos-slot .pos-label{font-size:9px;color:rgba(255,255,255,0.25);text-transform:uppercase;letter-spacing:0.5px;pointer-events:none}
+  .pos-slot.filled{border:none;pointer-events:none}
+  .magnet{position:absolute;z-index:50;min-width:58px;height:30px;border-radius:6px;background:#e8c840;color:#111;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:0.3px;display:flex;align-items:center;justify-content:center;padding:0 8px;cursor:grab;box-shadow:0 2px 6px rgba(0,0,0,0.5);transform:translate(-50%,-50%);white-space:nowrap}
+  .magnet.dragging{box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:200;opacity:0.9}
+  #editOverlay{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.55);align-items:center;justify-content:center}
+  #editOverlay.show{display:flex}
+  #editBox{background:#1a1a1a;border-radius:12px;padding:16px;width:260px;display:flex;flex-direction:column;gap:10px;box-shadow:0 12px 40px rgba(0,0,0,0.7);border:1px solid #333}
+  #editBox .edit-title{font-family:'Bebas Neue',sans-serif;font-size:16px;color:#e8c840;letter-spacing:2px}
+  #editBox input{height:40px;border:none;border-radius:8px;background:#222;color:#fff;padding:0 14px;font-size:16px;font-family:'Barlow Condensed',sans-serif;outline:none}
+  #editBox input:focus{box-shadow:0 0 0 2px #e8c840}
+  #editBox .btn-row{display:flex;gap:8px}
+  #editBox button{flex:1;height:38px;border:none;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;cursor:pointer;letter-spacing:0.5px}
+  #editBox .save-btn{background:#e8c840;color:#111}
+  #editBox .clear-btn{background:#333;color:#aaa}
+  #editBox .cancel-btn{background:#222;color:#666}
+</style>
+</head>
+<body>
+<div id="app"><div id="ground"></div></div>
+<div id="editOverlay">
+  <div id="editBox">
+    <div class="edit-title" id="editTitle">FB</div>
+    <input id="editInput" type="text" placeholder="Player name…" enterkeyhint="done" autocomplete="off"/>
+    <div class="btn-row">
+      <button class="save-btn" id="editSave">SAVE</button>
+      <button class="clear-btn" id="editClear">CLEAR</button>
+      <button class="cancel-btn" id="editCancel">✕</button>
+    </div>
+  </div>
+</div>
+<script>
+const ground=document.getElementById('ground'),overlay=document.getElementById('editOverlay'),editTitle=document.getElementById('editTitle'),editInput=document.getElementById('editInput'),editSave=document.getElementById('editSave'),editClear=document.getElementById('editClear'),editCancel=document.getElementById('editCancel');
+
+const positions=[
+  {id:'fpl',x:22,y:6,label:'FP'},{id:'ff',x:50,y:4,label:'FF'},{id:'fpr',x:78,y:6,label:'FP'},
+  {id:'hfl',x:18,y:17,label:'HF'},{id:'chf',x:50,y:15,label:'CHF'},{id:'hfr',x:82,y:17,label:'HF'},
+  {id:'lw',x:8,y:36,label:'LW'},
+  {id:'ml',x:36,y:36,label:'MID'},
+  {id:'c',x:50,y:33,label:'C'},
+  {id:'rk',x:50,y:41,label:'RK'},
+  {id:'mr',x:64,y:36,label:'MID'},
+  {id:'rw',x:92,y:36,label:'RW'},
+  {id:'hbl',x:18,y:55,label:'HB'},{id:'chb',x:50,y:57,label:'CHB'},{id:'hbr',x:82,y:55,label:'HB'},
+  {id:'bpl',x:22,y:68,label:'BP'},{id:'fb',x:50,y:70,label:'FB'},{id:'bpr',x:78,y:68,label:'BP'},
+  // Interchange: IC IC IC IC then EMG
+  {id:'ic1',x:14,y:82,label:'IC'},{id:'ic2',x:32,y:82,label:'IC'},
+  {id:'ic3',x:50,y:82,label:'IC'},{id:'ic4',x:68,y:82,label:'IC'},
+  {id:'emg',x:86,y:82,label:'EMG'},
+  // Extra rows
+  {id:'e1',x:14,y:89,label:'---'},{id:'e2',x:32,y:89,label:'---'},
+  {id:'e3',x:50,y:89,label:'---'},{id:'e4',x:68,y:89,label:'---'},{id:'e5',x:86,y:89,label:'---'},
+  {id:'e6',x:14,y:96,label:'---'},{id:'e7',x:32,y:96,label:'---'},
+  {id:'e8',x:50,y:96,label:'---'},{id:'e9',x:68,y:96,label:'---'},{id:'e10',x:86,y:96,label:'---'},
+];
+
+const zones=[
+  {label:'FORWARD',y:9.5},
+  {label:'MIDFIELD',y:29},
+  {label:'DEFENCE',y:63.5},
+];
+
+let roster=JSON.parse(localStorage.getItem('afl_roster')||'{}');
+function save(){localStorage.setItem('afl_roster',JSON.stringify(roster))}
+
+function drawOval(){
+  ground.querySelectorAll('svg.bg,.divider').forEach(e=>e.remove());
+  const w=ground.clientWidth,h=ground.clientHeight;
+  const cx=w/2,cy=h*0.38,rx=w*0.46,ry=h*0.37;
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.classList.add('bg');svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
+  svg.innerHTML=`<defs><radialGradient id="turf" cx="50%" cy="38%" r="50%"><stop offset="0%" stop-color="#1e6b35"/><stop offset="100%" stop-color="#0d3a1a"/></radialGradient></defs>
+    <rect width="${w}" height="${h}" fill="url(#turf)"/>
+    <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2"/>
+    <ellipse cx="${cx}" cy="${cy}" rx="${rx*0.55}" ry="${ry*0.40}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+    <rect x="${cx-18}" y="${cy-ry-1}" width="36" height="18" rx="2" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="1.5"/>
+    <rect x="${cx-18}" y="${cy+ry-17}" width="36" height="18" rx="2" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="1.5"/>
+    <line x1="${cx-rx}" y1="${cy}" x2="${cx+rx}" y2="${cy}" stroke="rgba(255,255,255,0.08)" stroke-width="1.5"/>`;
+  ground.prepend(svg);
+
+  // Interchange divider + label
+  const div=document.createElement('div');div.className='divider';div.style.top='78%';ground.appendChild(div);
+  const lbl=document.createElement('div');lbl.className='zone-label';lbl.style.top='78.5%';lbl.textContent='INTERCHANGE';ground.appendChild(lbl);
+
+  // Emergency label above EMG slot
+  const emgLbl=document.createElement('div');emgLbl.className='zone-label right-aligned';emgLbl.style.top='78.5%';emgLbl.textContent='EMERGENCY';ground.appendChild(emgLbl);
+}
+
+let dragState=null;
+
+function renderAll(){
+  ground.querySelectorAll('.zone-label,.pos-slot,.magnet,.divider').forEach(e=>e.remove());
+  drawOval();
+  zones.forEach(z=>{const el=document.createElement('div');el.className='zone-label';el.style.top=z.y+'%';el.textContent=z.label;ground.appendChild(el)});
+  positions.forEach(p=>{
+    const name=roster[p.id];
+    const slot=document.createElement('div');
+    slot.className='pos-slot'+(name?' filled':'');
+    slot.style.left=p.x+'%';slot.style.top=p.y+'%';
+    if(!name){slot.innerHTML=`<span class="pos-label">${p.label}</span>`;slot.addEventListener('click',()=>openEdit(p.id))}
+    ground.appendChild(slot);
+    if(name){
+      const mag=document.createElement('div');mag.className='magnet';mag.style.left=p.x+'%';mag.style.top=p.y+'%';
+      mag.textContent=name;mag.dataset.posId=p.id;
+      const startDrag=(px,py,e)=>{e.preventDefault();mag.classList.add('dragging');const gR=ground.getBoundingClientRect();
+        dragState={el:mag,posId:p.id,moved:false,offX:px-(gR.left+(p.x/100)*gR.width),offY:py-(gR.top+(p.y/100)*gR.height),curX:p.x,curY:p.y}};
+      mag.addEventListener('touchstart',e=>{const t=e.touches[0];startDrag(t.clientX,t.clientY,e)},{passive:false});
+      mag.addEventListener('mousedown',e=>startDrag(e.clientX,e.clientY,e));
+      ground.appendChild(mag);
+    }
+  });
+}
+
+const onMove=(px,py)=>{if(!dragState)return;dragState.moved=true;const gR=ground.getBoundingClientRect();
+  const x=((px-dragState.offX-gR.left)/gR.width)*100,y=((py-dragState.offY-gR.top)/gR.height)*100;
+  dragState.curX=Math.max(0,Math.min(100,x));dragState.curY=Math.max(0,Math.min(100,y));
+  dragState.el.style.left=dragState.curX+'%';dragState.el.style.top=dragState.curY+'%'};
+
+const onEnd=()=>{if(!dragState)return;dragState.el.classList.remove('dragging');const ds=dragState;dragState=null;
+  if(!ds.moved){openEdit(ds.posId);return}
+  let best=null,bd=Infinity;
+  positions.forEach(p=>{if(p.id===ds.posId||!roster[p.id]){const dx=ds.curX-p.x,dy=ds.curY-p.y,d=dx*dx+dy*dy;if(d<bd){bd=d;best=p}}});
+  if(best&&bd<400){const name=roster[ds.posId];if(roster[best.id]){roster[ds.posId]=roster[best.id]}else{delete roster[ds.posId]}roster[best.id]=name}
+  save();renderAll()};
+
+document.addEventListener('touchmove',e=>{if(dragState){e.preventDefault();const t=e.touches[0];onMove(t.clientX,t.clientY)}},{passive:false});
+document.addEventListener('touchend',onEnd);document.addEventListener('mousemove',e=>onMove(e.clientX,e.clientY));document.addEventListener('mouseup',onEnd);
+
+let editingPosId=null;
+function openEdit(posId){editingPosId=posId;const p=positions.find(x=>x.id===posId);editTitle.textContent=p.label;editInput.value=roster[posId]||'';overlay.classList.add('show');setTimeout(()=>{editInput.focus();editInput.select()},50)}
+function closeEdit(){overlay.classList.remove('show');editingPosId=null}
+
+editSave.addEventListener('click',()=>{const v=editInput.value.trim();if(v)roster[editingPosId]=v;else delete roster[editingPosId];save();renderAll();closeEdit()});
+editClear.addEventListener('click',()=>{delete roster[editingPosId];save();renderAll();closeEdit()});
+editCancel.addEventListener('click',closeEdit);
+overlay.addEventListener('click',e=>{if(e.target===overlay)closeEdit()});
+editInput.addEventListener('keydown',e=>{if(e.key==='Enter')editSave.click()});
+
+renderAll();window.addEventListener('resize',renderAll);
+</script>
+</body>
+</html>
