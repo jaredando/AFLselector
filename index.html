@@ -256,14 +256,14 @@ const triggerAutoRefresh = async () => {
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') triggerAutoRefresh(); });
 window.addEventListener('focus', triggerAutoRefresh);
 
-// --- 30 SECOND BACKGROUND POLLING ---
+// --- 15 SECOND BACKGROUND POLLING ---
 setInterval(async () => {
   if (!editingPosId && !dragState && document.visibilityState === 'visible') {
     refreshBtn.textContent = '↻ AUTO...';
     await loadFromCloud();
     refreshBtn.textContent = '↻ REFRESH';
   }
-}, 30000); 
+}, 15000); 
 
 // --- UI AND DRAG LOGIC ---
 function drawOval(){
