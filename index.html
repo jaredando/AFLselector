@@ -165,8 +165,10 @@ let editingPosId=null;
 async function loadFromCloud(){
   try{
     syncStatus.textContent='syncing…';
+    // ADDED cache: 'no-store' to stop mobile browsers from reusing old data
     const res = await fetch(`${JSONBIN_URL}/latest`, {
-      headers: { 'X-Master-Key': API_KEY }
+      headers: { 'X-Master-Key': API_KEY },
+      cache: 'no-store' 
     });
     if(res.ok){
       const data = await res.json();
@@ -211,15 +213,22 @@ refreshBtn.addEventListener('click', async () => {
   refreshBtn.textContent = '↻ REFRESH';
 });
 
-// --- AUTO REFRESH ON TAB FOCUS ---
-document.addEventListener('visibilitychange', async () => {
-  // Only refresh if the tab is visible AND the user isn't currently editing a name
-  if (document.visibilityState === 'visible' && !editingPosId) {
+// --- BULLETPROOF AUTO REFRESH ---
+const triggerAutoRefresh = async () => {
+  if (!editingPosId) {
     refreshBtn.textContent = '↻ REFRESHING...';
     await loadFromCloud();
     refreshBtn.textContent = '↻ REFRESH';
   }
+};
+
+// Fires when tab becomes visible (desktop mostly)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') triggerAutoRefresh();
 });
+
+// Fires when window gets focus (mobile safari fallback)
+window.addEventListener('focus', triggerAutoRefresh);
 
 // --- UI AND DRAG LOGIC ---
 function drawOval(){
