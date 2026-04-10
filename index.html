@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Team Sheet</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@500;700&display=swap');
@@ -16,72 +16,69 @@
                 repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0px, rgba(255,255,255,0.04) 2px, transparent 2px, transparent 14px),
                 #073175; 
     display:flex; align-items:center; justify-content:center;
-    padding: 0 5px; 
+    padding: 10px;
   }
   
   #ground{
     position:relative; 
-    width:100%; max-width:540px;
-    height:100%; max-height:880px;
-    display: flex; align-items: center; justify-content: center;
+    width:100%; max-width:500px; 
+    height:100%; max-height:900px;
   }
   
   #ground svg.bg{position:absolute;inset:0;width:100%;height:100%;z-index:1;}
   
-  .zone-label{position:absolute;left:50%;transform:translateX(-50%);font-family:'Bebas Neue',sans-serif;font-size:14px;color:rgba(255,255,255,0.25);letter-spacing:4px;pointer-events:none;text-transform:uppercase;z-index:2}
+  .zone-label{position:absolute;left:50%;transform:translateX(-50%);font-family:'Bebas Neue',sans-serif;font-size:11px;color:rgba(255,255,255,0.2);letter-spacing:3px;pointer-events:none;text-transform:uppercase;z-index:2}
   .zone-label.right-aligned{left:82%;transform:translateX(-50%)}
-  .divider{position:absolute;left:5%;width:90%;height:1.5px;background:rgba(255,255,255,0.15);z-index:2;pointer-events:none}
+  .divider{position:absolute;left:5%;width:90%;height:1px;background:rgba(255,255,255,0.1);z-index:2;pointer-events:none}
   
-  /* SKINNER MAGNETS */
+  /* Skinnier Magnet Styling + Shifted Right 5px */
   .pos-slot, .magnet {
-    position:absolute; transform:translate(-50%,-50%); z-index:3;
-    width:90px; height:26px; border-radius:3px;
+    position:absolute; 
+    transform:translate(calc(-50% + 5px), -50%); 
+    z-index:3;
+    width:82px; height:20px; border-radius:2px;
   }
 
-  .pos-slot{ border:1px dashed rgba(255,255,255,0.25); display:flex; align-items:center; justify-content:center; cursor:pointer; background:rgba(255,255,255,0.02); }
-  .pos-slot .pos-label{ font-size:10px; color:rgba(255,255,255,0.25); text-transform:uppercase; font-weight:bold; }
+  .pos-slot{ border:1px dashed rgba(255,255,255,0.2); display:flex; align-items:center; justify-content:center; cursor:pointer; background:rgba(255,255,255,0.01); }
+  .pos-slot .pos-label{ font-size:8px; color:rgba(255,255,255,0.2); text-transform:uppercase; font-weight:bold; }
   .pos-slot.filled{ border:none; background:transparent; pointer-events:none }
   
   .magnet{
     z-index:50; background:#ffffff; color:#073175; 
-    font-family:'Barlow Condensed', sans-serif; font-weight:700; font-size:12.5px;
-    display:flex; align-items:center; padding:0 4px 0 22px; 
-    cursor:grab; box-shadow:0 4px 10px rgba(0,0,0,0.35); white-space:nowrap;
-    transition: color 0.3s ease;
+    font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:11.5px;
+    display:flex; align-items:center; padding:0 4px 0 16px; 
+    cursor:grab; box-shadow:0 2px 6px rgba(0,0,0,0.3); white-space:nowrap;
+    transition: color 0.2s ease;
   }
-  .magnet.dragging{ box-shadow:0 12px 24px rgba(0,0,0,0.6); z-index:200; opacity:0.98; }
-  .magnet.warning { color: #c00000 !important; }
+  .magnet.warning { color: #b00000 !important; }
 
-  /* Bench - Scaled down to match new width */
-  .is-bench { width: 78px !important; font-size: 11px !important; padding-left: 20px !important; }
+  .mag-name { width:100%; text-align:left; overflow:hidden; text-overflow:ellipsis; }
+
+  /* Bench specific sizes */
+  .is-bench { width: 72px !important; font-size: 10.5px !important; padding:0 2px 0 12px !important; }
 
   .mag-badge {
-    position:absolute; left:-12px; top:50%; transform:translateY(-50%);
-    width:24px; height:24px; background:#6786b8; 
-    border-radius:50%; border:2px solid #ffffff; 
+    position:absolute; left:-10px; top:50%; transform:translateY(-50%);
+    width:22px; height:22px; background:#6786b8; 
+    border-radius:50%; border:1.5px solid #ffffff; 
     display:flex; justify-content:center; align-items:center;
-    color:#fff; font-weight:700; box-shadow: 1px 0 4px rgba(0,0,0,0.2);
-    font-family: "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji", sans-serif;
+    color:#fff; font-weight:700; box-shadow: 1px 0 3px rgba(0,0,0,0.1);
   }
   
-  #refreshBtn{position:absolute;top:10px;left:10px;z-index:100;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.1);color:#fff;font-family:'Barlow Condensed',sans-serif;font-size:12px;padding:6px 10px;border-radius:6px;cursor:pointer;letter-spacing:1px;}
-  #syncStatus{position:absolute;top:10px;right:10px;z-index:100;font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:1px}
+  #refreshBtn{position:absolute;top:10px;left:10px;z-index:100;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#aaa;font-family:'Barlow Condensed',sans-serif;font-size:10px;padding:3px 7px;border-radius:4px;cursor:pointer;}
+  #syncStatus{position:absolute;top:10px;right:10px;z-index:100;font-size:9px;color:rgba(255,255,255,0.3);}
 
-  #editOverlay{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+  #editOverlay{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;backdrop-filter:blur(3px);}
   #editOverlay.show{display:flex}
-  #editBox{background:#111827;border-radius:14px;padding:24px;width:300px;display:flex;flex-direction:column;gap:15px;border:1px solid #374151;box-shadow: 0 20px 50px rgba(0,0,0,0.5);}
-  #editBox .edit-title{font-family:'Bebas Neue',sans-serif;font-size:22px;color:#60a5fa;letter-spacing:2px}
-  #editBox label { font-size: 11px; color: #9ca3af; font-weight: bold; margin-bottom: -10px; letter-spacing: 1px;}
-  #editBox input{height:48px;border:none;border-radius:8px;background:#1f2937;color:#fff;padding:0 16px;font-size:18px;outline:none}
+  #editBox{background:#111827;border-radius:12px;padding:20px;width:280px;display:flex;flex-direction:column;gap:12px;border:1px solid #374151}
+  #editBox .edit-title{font-family:'Bebas Neue',sans-serif;font-size:20px;color:#60a5fa;letter-spacing:2px}
+  #editBox label { font-size: 10px; color: #9ca3af; font-weight: bold; margin-bottom: -8px; letter-spacing: 1px;}
+  #editBox input{height:44px;border:none;border-radius:8px;background:#1f2937;color:#fff;padding:0 14px;font-size:16px;outline:none}
   #editBox input:focus{box-shadow:0 0 0 2px #60a5fa}
-  #editBox .btn-row{display:flex;gap:10px; margin-top: 10px;}
-  #editBox button{flex:1;height:44px;border:none;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;cursor:pointer;}
+  #editBox .btn-row{display:flex;gap:8px; margin-top: 10px;}
+  #editBox button{flex:1;height:40px;border:none;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;cursor:pointer;}
   #editBox .save-btn{background:#3b82f6;color:#fff}
   #editBox .clear-btn{background:#374151;color:#fff}
-  
-  @media (max-width: 500px) { #ground { transform: scale(0.9); } }
-  @media (max-width: 420px) { #ground { transform: scale(0.82); } }
-  @media (max-width: 370px) { #ground { transform: scale(0.75); } }
 </style>
 </head>
 <body>
@@ -93,15 +90,15 @@
 
 <div id="editOverlay">
   <div id="editBox">
-    <div class="edit-title" id="editTitle">POSITION</div>
+    <div class="edit-title" id="editTitle">POS</div>
     <label>PLAYER NAME</label>
-    <input id="editInput" type="text" placeholder="Full Name…" autocomplete="off"/>
+    <input id="editInput" type="text" placeholder="Name…" autocomplete="off"/>
     <label>BADGE (C, 10, 🇮🇪)</label>
-    <input id="badgeInput" type="text" placeholder="Badge…" autocomplete="off"/>
+    <input id="badgeInput" type="text" placeholder="Max 2" maxlength="2" autocomplete="off"/>
     <div class="btn-row">
       <button class="save-btn" id="editSave">SAVE</button>
       <button class="clear-btn" id="editClear">CLEAR</button>
-      <button id="editCancel" style="background:transparent; color:#6b7280; font-size:20px;">✕</button>
+      <button id="editCancel" style="background:transparent; color:#6b7280;">✕</button>
     </div>
   </div>
 </div>
@@ -116,16 +113,18 @@ const syncStatus=document.getElementById('syncStatus'),refreshBtn=document.getEl
 const positions=[
   {id:'fpl',x:22,y:6,label:'FP'},{id:'ff',x:50,y:4,label:'FF'},{id:'fpr',x:78,y:6,label:'FP'},
   {id:'hfl',x:18,y:17,label:'HF'},{id:'chf',x:50,y:15,label:'CHF'},{id:'hfr',x:82,y:17,label:'HF'},
-  {id:'lw',x:7,y:31,label:'LW'},{id:'ml',x:26,y:36,label:'MID'}, 
-  {id:'c',x:50,y:26,label:'C'},{id:'rk',x:50,y:46,label:'RK'},
-  {id:'mr',x:74,y:36,label:'MID'},{id:'rw',x:93,y:31,label:'RW'},
+  {id:'lw',x:7,y:32,label:'LW'},{id:'ml',x:26,y:36,label:'MID'}, 
+  {id:'c',x:50,y:28,label:'C'},{id:'rk',x:50,y:46,label:'RK'},
+  {id:'mr',x:74,y:36,label:'MID'},{id:'rw',x:93,y:32,label:'RW'},
   {id:'hbl',x:18,y:59,label:'HB'},{id:'chb',x:50,y:61,label:'CHB'},{id:'hbr',x:82,y:59,label:'HB'},
   {id:'bpl',x:22,y:70,label:'BP'},{id:'fb',x:50,y:72,label:'FB'},{id:'bpr',x:78,y:70,label:'BP'},
-  {id:'ic1',x:13,y:82,label:'IC',bench:true},{id:'ic2',x:31,y:82,label:'IC',bench:true},
-  {id:'ic3',x:49,y:82,label:'IC',bench:true},{id:'ic4',x:67,y:82,label:'IC',bench:true},
-  {id:'emg',x:86,y:82,label:'EMG',bench:true},
-  {id:'e1',x:13,y:89,label:'---',bench:true},{id:'e2',x:31,y:89,label:'---',bench:true},{id:'e3',x:49,y:89,label:'---',bench:true},{id:'e4',x:67,y:89,label:'---',bench:true},{id:'e5',x:86,y:89,label:'---',bench:true},
-  {id:'e6',x:13,y:96,label:'---',bench:true},{id:'e7',x:31,y:96,label:'---',bench:true},{id:'e8',x:49,y:96,label:'---',bench:true},{id:'e9',x:67,y:96,label:'---',bench:true},{id:'e10',x:86,y:96,label:'---',bench:true},
+  
+  /* Spread Bench Spacing: Ultra Compressed Vertical y: 84, 87, 90 */
+  {id:'ic1',x:10,y:84,label:'IC',bench:true},{id:'ic2',x:30,y:84,label:'IC',bench:true},
+  {id:'ic3',x:50,y:84,label:'IC',bench:true},{id:'ic4',x:70,y:84,label:'IC',bench:true},
+  {id:'emg',x:90,y:84,label:'EMG',bench:true},
+  {id:'e1',x:10,y:87,label:'---',bench:true},{id:'e2',x:30,y:87,label:'---',bench:true},{id:'e3',x:50,y:87,label:'---',bench:true},{id:'e4',x:70,y:87,label:'---',bench:true},{id:'e5',x:90,y:87,label:'---',bench:true},
+  {id:'e6',x:10,y:90,label:'---',bench:true},{id:'e7',x:30,y:90,label:'---',bench:true},{id:'e8',x:50,y:90,label:'---',bench:true},{id:'e9',x:70,y:90,label:'---',bench:true},{id:'e10',x:90,y:90,label:'---',bench:true},
 ];
 
 const zones=[{label:'FORWARD',y:9.5},{label:'MIDFIELD',y:31},{label:'DEFENCE',y:66}];
@@ -163,24 +162,19 @@ function drawOval(){
   const cx=w*0.5, cy=h*0.38, rx=w*0.46, ry=h*0.37, sq=w*0.42; 
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
   svg.classList.add('bg');svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
-  const lineCol = "rgba(255,255,255,0.35)", strokeW = "3"; 
+  const lineCol = "rgba(255,255,255,0.3)", strokeW = "3"; 
+  
   svg.innerHTML=`
     <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
-    <rect x="${cx-18}" y="${cy-ry-1}" width="36" height="18" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
-    <rect x="${cx-18}" y="${cy+ry-17}" width="36" height="18" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
+    <rect x="${cx-15}" y="${cy-ry-1}" width="30" height="15" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
+    <rect x="${cx-15}" y="${cy+ry-14}" width="30" height="15" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
     <rect x="${cx - sq/2}" y="${cy - sq/2}" width="${sq}" height="${sq}" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
-    <image href="https://aflnational.com/wp-content/uploads/2025/12/UNSW-Eastern-Suburbs-Bulldogs-AFL-footy-club-logo.png" x="${cx - 30}" y="${cy - 30}" height="60" width="60" />
+    <image href="https://aflnational.com/wp-content/uploads/2025/12/UNSW-Eastern-Suburbs-Bulldogs-AFL-footy-club-logo.png" x="${cx - 36}" y="${cy - 36}" height="72" width="72" />
   `;
   ground.prepend(svg);
-  const div=document.createElement('div');div.className='divider';div.style.top='79%';ground.appendChild(div);
-  
-  const lbl=document.createElement('div');lbl.className='zone-label';lbl.style.top='77%';lbl.textContent='INTERCHANGE';ground.appendChild(lbl);
-  const emgLbl=document.createElement('div');emgLbl.className='zone-label right-aligned';emgLbl.style.top='77%';emgLbl.textContent='EMERGENCY';ground.appendChild(emgLbl);
-}
-
-function isEmoji(str) {
-  const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/u;
-  return emojiRegex.test(str);
+  const div=document.createElement('div');div.className='divider';div.style.top='78%';ground.appendChild(div);
+  const lbl=document.createElement('div');lbl.className='zone-label';lbl.style.top='78.5%';lbl.textContent='INTERCHANGE';ground.appendChild(lbl);
+  const emgLbl=document.createElement('div');emgLbl.className='zone-label right-aligned';emgLbl.style.top='78.5%';emgLbl.textContent='EMERGENCY';ground.appendChild(emgLbl);
 }
 
 function renderAll(){
@@ -209,13 +203,15 @@ function renderAll(){
       const mag=document.createElement('div');
       mag.className='magnet' + (warningIds.has(p.id) ? ' warning' : '') + (p.bench?' is-bench':'');
       mag.style.left=p.x+'%';mag.style.top=p.y+'%';
-      let bFS = (isEmoji(badge) || badge.length === 1) ? '16px' : '13px';
-      mag.innerHTML = `<div class="mag-badge" style="font-size:${bFS}">${badge||''}</div><div style="overflow:hidden;text-overflow:ellipsis">${name}</div>`;
-      mag.onpointerdown=e=>{
-        if(!e.isPrimary)return; e.preventDefault(); mag.setPointerCapture(e.pointerId);
+      const badgeFontSize = (badge && badge.length === 1) ? '15px' : '11px';
+      mag.innerHTML = `<div class="mag-badge" style="font-size:${badgeFontSize}">${badge||''}</div><div class="mag-name">${name}</div>`;
+      mag.dataset.posId=p.id;
+      mag.addEventListener('pointerdown', e => {
+        if (!e.isPrimary || e.button !== 0) return; 
+        e.preventDefault(); mag.setPointerCapture(e.pointerId); 
         const gR=ground.getBoundingClientRect();
         dragState={el:mag,posId:p.id,moved:false,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,offX:e.clientX-(gR.left+(p.x/100)*gR.width),offY:e.clientY-(gR.top+(p.y/100)*gR.height),curX:p.x,curY:p.y};
-      };
+      });
       ground.appendChild(mag);
     }
   });
@@ -224,7 +220,7 @@ function renderAll(){
 const onMove=e=>{
   if(!dragState||dragState.pointerId!==e.pointerId)return;
   const dx=e.clientX-dragState.startX,dy=e.clientY-dragState.startY;
-  if(!dragState.moved&&(dx*dx+dy*dy>100)){dragState.moved=true;dragState.el.classList.add('dragging');}
+  if(!dragState.moved&&(dx*dx+dy*dy>64)){dragState.moved=true;}
   if(dragState.moved){
     const gR=ground.getBoundingClientRect();
     const x=((e.clientX-dragState.offX-gR.left)/gR.width)*100,y=((e.clientY-dragState.offY-gR.top)/gR.height)*100;
@@ -235,11 +231,12 @@ const onMove=e=>{
 const onEnd=e=>{
   if(!dragState||dragState.pointerId!==e.pointerId)return;
   dragState.el.classList.remove('dragging');
+  dragState.el.releasePointerCapture(e.pointerId);
   const ds=dragState; dragState=null;
   if(!ds.moved){openEdit(ds.posId);return;}
   let best=null,bd=Infinity;
   positions.forEach(p=>{const dx=ds.curX-p.x,dy=ds.curY-p.y,d=dx*dx+dy*dy;if(d<bd){bd=d;best=p;}});
-  if(best&&bd<400){
+  if(best&&bd<350){
     const dData=roster[ds.posId];
     if(roster[best.id])roster[ds.posId]=roster[best.id];else delete roster[ds.posId];
     roster[best.id]=dData;
@@ -255,16 +252,19 @@ function openEdit(id){
   badgeInput.value=typeof data==='object'?data.badge:'';
   overlay.classList.add('show'); setTimeout(()=>{editInput.focus();editInput.select()},50);
 }
-editSave.onclick=()=>{
-  const n=editInput.value.trim(),b=badgeInput.value.trim();
-  if(n)roster[editingPosId]={name:n,badge:b};else delete roster[editingPosId];
-  saveToCloud();renderAll();overlay.classList.remove('show');
-};
-editClear.onclick=()=>{delete roster[editingPosId];saveToCloud();renderAll();overlay.classList.remove('show');};
-editCancel.onclick=()=>overlay.classList.remove('show');
+function closeEdit(){overlay.classList.remove('show');editingPosId=null}
+editSave.addEventListener('click',()=>{
+  const name = editInput.value.trim(), badge = badgeInput.value.trim();
+  if(name) roster[editingPosId] = { name, badge };
+  else delete roster[editingPosId];
+  saveToCloud(); renderAll(); closeEdit();
+});
+editClear.addEventListener('click',()=>{ delete roster[editingPosId]; saveToCloud(); renderAll(); closeEdit();});
+editCancel.addEventListener('click',closeEdit);
+editInput.addEventListener('keydown',e=>{if(e.key==='Enter')editSave.click()});
 
-document.addEventListener('visibilitychange',()=>document.visibilityState==='visible'&&setTimeout(loadFromCloud,500));
-loadFromCloud(); window.onresize=renderAll;
+loadFromCloud();
+window.addEventListener('resize',renderAll);
 </script>
 </body>
 </html>
