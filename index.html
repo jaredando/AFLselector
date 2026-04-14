@@ -90,6 +90,32 @@
   }
   .toast-msg.show{ opacity:1; transform:scale(1); }
 
+  /* ── Password Overlay ── */
+  #pwOverlay{
+    display:none; position:fixed; inset:0; z-index:2000; 
+    background:#051b43; align-items:center; justify-content:center; 
+    flex-direction:column; gap:16px;
+  }
+  #pwOverlay.show{display:flex;}
+  #pwOverlay .pw-box{
+    background:#0f1f3d; padding:30px; border-radius:12px; 
+    border:1px solid rgba(255,255,255,0.1); display:flex; 
+    flex-direction:column; gap:16px; width:260px;
+  }
+  #pwOverlay input{
+    height:44px; background:#1a2f55; border:1px solid rgba(255,255,255,0.2); 
+    color:#fff; border-radius:6px; padding:0 12px; text-align:center; font-size:18px;
+    outline:none;
+  }
+  #pwOverlay button{
+    height:40px; background:#3b82f6; color:#fff; border:none; 
+    border-radius:6px; font-family:'Barlow Condensed',sans-serif; 
+    font-weight:700; cursor:pointer; letter-spacing:1px;
+  }
+
+  /* ── Mode Badge ── */
+  #modeBadge{position:absolute; top:42px; left:50%; transform:translateX(-50%); font-size:9px; color:rgba(255,255,255,0.4); letter-spacing:2px; z-index:101; text-transform:uppercase; pointer-events:none;}
+
   /* ── Top bar ── */
   #topBar{position:absolute;top:10px;left:10px;right:10px;z-index:100;display:flex;align-items:center;justify-content:space-between;}
   #menuBtn{background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#aaa;font-size:15px;width:32px;height:28px;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;}
@@ -140,6 +166,7 @@
   <div id="topBar">
     <button id="menuBtn">&#9776;</button>
     <div id="activeBoardName"></div>
+    <div id="modeBadge"></div>
     <button id="refreshBtn">↻ REFRESH</button>
   </div>
   <div id="boardTrackWrapper">
@@ -153,6 +180,15 @@
 
   <!-- Global Message Overlay -->
   <div id="toastOverlay"></div>
+</div>
+
+<!-- Password Overlay -->
+<div id="pwOverlay">
+  <div class="pw-box">
+    <div style="font-family:'Bebas Neue',sans-serif; font-size:20px; color:#60a5fa; letter-spacing:2px; text-align:center;">COACH ACCESS</div>
+    <input type="password" id="pwInput" placeholder="Password...">
+    <button id="pwSubmit">LOGIN</button>
+  </div>
 </div>
 
 <!-- Board menu -->
@@ -184,6 +220,12 @@
 </div>
 
 <script>
+// ── Mode Detection ──
+const urlParams = new URLSearchParams(window.location.search);
+let isViewOnly = urlParams.has('view'); 
+let isDemo = urlParams.has('demo');     
+let isEdit = urlParams.has('edit'); 
+
 const BIN_ID='69de398f856a68218931e5ea';
 const API_KEY='$2a$10$pzhEn9dwvvZP9ycmWjqIqOxQXIwhs.wWSOnj6BZv5SltQmU.XKXR6';
 const JSONBIN_URL=`https://api.jsonbin.io/v3/b/${BIN_ID}`;
@@ -210,7 +252,11 @@ const syncStatus=document.getElementById('syncStatus'),
       newBoardForm=document.getElementById('newBoardForm'),
       newBoardInput=document.getElementById('newBoardInput'),
       newBoardConfirm=document.getElementById('newBoardConfirm'),
-      boardListEl=document.getElementById('boardList');
+      boardListEl=document.getElementById('boardList'),
+      modeBadge=document.getElementById('modeBadge'),
+      pwOverlay=document.getElementById('pwOverlay'),
+      pwInput=document.getElementById('pwInput'),
+      pwSubmit=document.getElementById('pwSubmit');
 
 const positions=[
   {id:'fpl',x:22,y:6,label:'FP'},{id:'ff',x:50,y:4,label:'FF'},{id:'fpr',x:78,y:6,label:'FP'},
@@ -239,6 +285,12 @@ function showMessage(text){
     el.classList.remove('show');
     setTimeout(() => el.remove(), 300);
   }, 1200);
+}
+
+function updateBadge() {
+  if (isViewOnly) modeBadge.textContent = 'View Only';
+  else if (isDemo) modeBadge.textContent = 'Demo Mode (Local Save)';
+  else modeBadge.textContent = 'Coach Mode';
 }
 
 function graphemeCount(str){
@@ -281,6 +333,19 @@ function setCurrentBoard(id){
 
 async function loadFromCloud(){
   refreshBtn.textContent = '↻ REFRESHING';
+  
+  if (isDemo) {
+    const saved = localStorage.getItem('afl_demo_data');
+    if (saved) {
+      allData = JSON.parse(saved);
+    } else {
+      ensureDefaultBoard();
+    }
+    syncStatus.textContent = 'local mode';
+    finalizeLoad();
+    return;
+  }
+
   try{
     syncStatus.textContent='syncing…';
     const res=await fetch(`${JSONBIN_URL}/latest?_t=${Date.now()}`,{headers:{'X-Master-Key':API_KEY},cache:'no-store'});
@@ -299,15 +364,14 @@ async function loadFromCloud(){
   }catch(e){
     syncStatus.textContent='offline';
     const saved=localStorage.getItem('afl_data');
-    if(saved){allData=JSON.parse(saved);}
-    else{
-      const old=JSON.parse(localStorage.getItem('afl_roster')||'{}');
-      const id=genId();
-      allData={boards:{[id]:{name:'Main Team',roster:old}}};
-    }
+    if(saved) allData=JSON.parse(saved);
   }
+  finalizeLoad();
+}
+
+function finalizeLoad() {
   ensureDefaultBoard();
-  const savedCurrent=localStorage.getItem('afl_current_board');
+  const savedCurrent=localStorage.getItem(isDemo ? 'afl_demo_current' : 'afl_current_board');
   const firstId=getBoardIds()[0];
   const startId=(savedCurrent&&allData.boards[savedCurrent])?savedCurrent:firstId;
   setCurrentBoard(startId);
@@ -319,9 +383,20 @@ async function loadFromCloud(){
 }
 
 function saveToCloud(){
+  if (isViewOnly) return; 
+
   allData.boards[currentBoardId].roster=roster;
+  
+  if (isDemo) {
+    localStorage.setItem('afl_demo_data', JSON.stringify(allData));
+    localStorage.setItem('afl_demo_current', currentBoardId);
+    syncStatus.textContent = 'saved locally';
+    return;
+  }
+
   localStorage.setItem('afl_data',JSON.stringify(allData));
   localStorage.setItem('afl_current_board',currentBoardId);
+  
   clearTimeout(saveTimer);
   saveTimer=setTimeout(async()=>{
     try{
@@ -360,7 +435,7 @@ function snapToBoard(index,animate=true){
   setCurrentBoard(ids[index]);
   renderBoardMenu();
   renderBoardIndicator();
-  localStorage.setItem('afl_current_board',currentBoardId);
+  localStorage.setItem(isDemo ? 'afl_demo_current' : 'afl_current_board', currentBoardId);
   saveToCloud();
 }
 
@@ -412,6 +487,7 @@ function switchBoard(id){
 }
 
 function createBoard(name){
+  if (isViewOnly) return;
   const id=genId();
   allData.boards[id]={name:name.trim(),roster:{}};
   switchBoard(id);
@@ -419,6 +495,9 @@ function createBoard(name){
 
 function renderBoardMenu(){
   boardListEl.innerHTML='';
+  if (isViewOnly) {
+    createBoardBtn.style.display = 'none';
+  }
   Object.entries(allData.boards).forEach(([id,board])=>{
     const item=document.createElement('div');
     item.className='board-item'+(id===currentBoardId?' active':'');
@@ -465,6 +544,7 @@ function drawOval(groundEl){
     <!-- Top Goal Posts (Flipped Inside) -->
     <line x1="${cx - postGap * 1.5}" y1="${cy - ry}" x2="${cx - postGap * 1.5}" y2="${cy - ry + behindH}" stroke="${lineCol}" stroke-width="${strokeW}" />
     <line x1="${cx - postGap * 0.5}" y1="${cy - ry}" x2="${cx - postGap * 0.5}" y2="${cy - ry + goalH}" stroke="${lineCol}" stroke-width="${strokeW}" />
+    <line x1="${cx + postGap * 0.5}" y1="${cy - ry}" x2="${cx + postGap * 0.5}" y2="${cy + ry - goalH}" stroke="${lineCol}" stroke-width="${strokeW}" style="display:none;"/> <!-- Fixed typo -->
     <line x1="${cx + postGap * 0.5}" y1="${cy - ry}" x2="${cx + postGap * 0.5}" y2="${cy - ry + goalH}" stroke="${lineCol}" stroke-width="${strokeW}" />
     <line x1="${cx + postGap * 1.5}" y1="${cy - ry}" x2="${cx + postGap * 1.5}" y2="${cy - ry + behindH}" stroke="${lineCol}" stroke-width="${strokeW}" />
 
@@ -512,7 +592,9 @@ function renderBoard(boardId,groundEl){
     slot.style.left=p.x+'%';slot.style.top=p.y+'%';
     if(!name){
       slot.innerHTML=`<span class="pos-label">${p.label}</span>`;
-      slot.onclick=()=>{if(!suppressClick)openEdit(p.id,boardId);};
+      if (!isViewOnly) {
+        slot.onclick=()=>{if(!suppressClick)openEdit(p.id,boardId);};
+      }
     }
     groundEl.appendChild(slot);
 
@@ -527,19 +609,24 @@ function renderBoard(boardId,groundEl){
       mag.innerHTML=`<div class="mag-badge" style="font-size:${badgeFontSize};color:${badgeColor}">${displayBadge}</div><div class="mag-name">${name}</div>`;
       mag.dataset.posId=p.id;
       mag.dataset.boardId=boardId;
-      mag.addEventListener('pointerdown',e=>{
-        if(boardId!==currentBoardId)return;
-        if(!e.isPrimary||e.button!==0)return;
-        e.preventDefault();mag.setPointerCapture(e.pointerId);
-        const gR=groundEl.getBoundingClientRect();
-        dragState={el:mag,posId:p.id,groundEl,moved:false,pointerId:e.pointerId,
-          startX:e.clientX,startY:e.clientY,
-          offX:e.clientX-(gR.left+(p.x/100)*gR.width),
-          offY:e.clientY-(gR.top+(p.y/100)*gR.height),
-          curX:p.x,curY:p.y,
-          nearRight:false,nearLeft:false,
-          rightTimer:null,leftTimer:null};
-      });
+      
+      if (!isViewOnly) {
+        mag.addEventListener('pointerdown',e=>{
+          if(boardId!==currentBoardId)return;
+          if(!e.isPrimary||e.button!==0)return;
+          e.preventDefault();mag.setPointerCapture(e.pointerId);
+          const gR=groundEl.getBoundingClientRect();
+          dragState={el:mag,posId:p.id,groundEl,moved:false,pointerId:e.pointerId,
+            startX:e.clientX,startY:e.clientY,
+            offX:e.clientX-(gR.left+(p.x/100)*gR.width),
+            offY:e.clientY-(gR.top+(p.y/100)*gR.height),
+            curX:p.x,curY:p.y,
+            nearRight:false,nearLeft:false,
+            rightTimer:null,leftTimer:null};
+        });
+      } else {
+        mag.style.cursor = 'default';
+      }
       groundEl.appendChild(mag);
     }
   });
@@ -570,11 +657,9 @@ const onMove=e=>{
     dragState.el.style.left=dragState.curX+'%';
     dragState.el.style.top=dragState.curY+'%';
 
-    // Edge detection (10% margins)
     const isInRightZone=e.clientX>window.innerWidth*0.90;
     const isInLeftZone=e.clientX<window.innerWidth*0.10;
     
-    // Right Zone Hold Logic
     if(isInRightZone){
       if(!dragState.rightTimer){
         dragState.rightTimer = setTimeout(()=>{
@@ -591,7 +676,6 @@ const onMove=e=>{
       edgeIndicatorRight.classList.remove('show');
     }
 
-    // Left Zone Hold Logic
     if(isInLeftZone){
       if(!dragState.leftTimer){
         dragState.leftTimer = setTimeout(()=>{
@@ -614,7 +698,6 @@ const onEnd=e=>{
   if(!dragState||dragState.pointerId!==e.pointerId)return;
   dragState.el.releasePointerCapture(e.pointerId);
   
-  // Cleanup timers
   clearTimeout(dragState.rightTimer);
   clearTimeout(dragState.leftTimer);
   
@@ -624,7 +707,6 @@ const onEnd=e=>{
 
   if(!ds.moved){openEdit(ds.posId,currentBoardId);return;}
 
-  // Handle Carry (Only if hold duration was met)
   if(ds.nearRight || ds.nearLeft){
     const ids=getBoardIds();
     const direction = ds.nearRight ? 1 : -1;
@@ -659,7 +741,6 @@ const onEnd=e=>{
     }
   }
 
-  // Normal drop snap
   let best=null,bd=Infinity;
   positions.forEach(p=>{const ddx=ds.curX-p.x,ddy=ds.curY-p.y,d=ddx*ddx+ddy*ddy;if(d<bd){bd=d;best=p;}});
   if(best&&bd<350){
@@ -672,6 +753,7 @@ const onEnd=e=>{
 document.onpointermove=onMove;document.onpointerup=onEnd;
 
 function openEdit(posId,boardId){
+  if (isViewOnly) return;
   editingPosId={posId,boardId};
   const data=allData.boards[boardId]?.roster[posId];
   editTitle.textContent=positions.find(x=>x.id===posId).label;
@@ -707,7 +789,42 @@ editInput.addEventListener('keydown',e=>{if(e.key==='Enter')editSave.click();});
 refreshBtn.addEventListener('click',loadFromCloud);
 window.addEventListener('resize',()=>{rebuildTrack();renderAllBoards();});
 
-loadFromCloud();
+// ── Initialization Logic ──
+function init() {
+  updateBadge();
+  if (isEdit) {
+    // Check if browser already has a saved login
+    if (localStorage.getItem('afl_coach_verified') === 'true') {
+      loadFromCloud();
+    } else {
+      pwOverlay.classList.add('show');
+      pwInput.focus();
+    }
+  } else {
+    loadFromCloud();
+  }
+}
+
+pwSubmit.onclick = () => {
+  if (pwInput.value === 'Yadz') {
+    // Save to browser so user doesn't have to enter again
+    localStorage.setItem('afl_coach_verified', 'true');
+    pwOverlay.classList.remove('show');
+    loadFromCloud();
+  } else {
+    showMessage("INCORRECT PASSWORD");
+    // Switch to view only if they fail
+    isEdit = false;
+    isViewOnly = true;
+    pwOverlay.classList.remove('show');
+    updateBadge();
+    loadFromCloud();
+  }
+};
+
+pwInput.onkeydown = e => { if(e.key === 'Enter') pwSubmit.onclick(); };
+
+init();
 </script>
 </body>
 </html>
