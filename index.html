@@ -61,7 +61,7 @@
   /* ── Edge carry indicators ── */
   .edge-indicator{
     position:fixed;top:0;bottom:0;width:48px;z-index:60;pointer-events:none;
-    opacity:0;transition:opacity 0.25s ease;
+    opacity:0;transition:opacity 0.2s ease;
     display:flex;align-items:center;
   }
   #edgeIndicatorRight{
@@ -220,7 +220,7 @@
 </div>
 
 <script>
-// ── Mode Detection ──
+// ── GLOBALS & STATE ──
 const urlParams = new URLSearchParams(window.location.search);
 let isViewOnly = urlParams.has('view'); 
 let isDemo = urlParams.has('demo');     
@@ -274,46 +274,13 @@ const positions=[
 ];
 const zones=[{label:'FORWARD',y:9.5},{label:'MIDFIELD',y:31},{label:'DEFENCE',y:66}];
 
-function showMessage(text){
-  const el = document.createElement('div');
-  el.className = 'toast-msg';
-  el.textContent = text;
-  toastOverlay.innerHTML = '';
-  toastOverlay.appendChild(el);
-  setTimeout(() => el.classList.add('show'), 50);
-  setTimeout(() => {
-    el.classList.remove('show');
-    setTimeout(() => el.remove(), 300);
-  }, 1200);
-}
-
-function updateBadge() {
-  if (isViewOnly) modeBadge.textContent = 'View Only';
-  else if (isDemo) modeBadge.textContent = 'Demo Mode (Local Save)';
-  else modeBadge.textContent = 'Coach Mode';
-}
-
-function graphemeCount(str){
-  if(!str)return 0;
-  if(typeof Intl!=='undefined'&&Intl.Segmenter)return[...new Intl.Segmenter().segment(str)].length;
-  return[...str].length;
-}
-function limitGraphemes(str,max){
-  if(!str)return'';
-  if(typeof Intl!=='undefined'&&Intl.Segmenter){
-    const segs=[...new Intl.Segmenter().segment(str)];
-    return segs.slice(0,max).map(s=>s.segment).join('');
-  }
-  return[...str].slice(0,max).join('');
-}
-
 let allData={boards:{}};
 let currentBoardId=null;
 let currentBoardIndex=0;
 let roster={};
-
 let saveTimer=null,editingPosId=null,dragState=null,suppressClick=false;
 
+// ── HELPERS ──
 function genId(){return'b_'+Date.now();}
 function getBoardIds(){return Object.keys(allData.boards);}
 
@@ -331,33 +298,58 @@ function setCurrentBoard(id){
   activeBoardNameEl.textContent=allData.boards[id].name;
 }
 
+function updateBadge() {
+  if (!modeBadge) return;
+  if (isViewOnly) modeBadge.textContent = 'View Only';
+  else if (isDemo) modeBadge.textContent = 'Demo Mode (Local Save)';
+  else modeBadge.textContent = 'Coach Mode';
+}
+
+function showMessage(text){
+  const el = document.createElement('div');
+  el.className = 'toast-msg';
+  el.textContent = text;
+  toastOverlay.innerHTML = '';
+  toastOverlay.appendChild(el);
+  setTimeout(() => el.classList.add('show'), 50);
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 300);
+  }, 1200);
+}
+
+function graphemeCount(str){
+  if(!str)return 0;
+  if(typeof Intl!=='undefined'&&Intl.Segmenter)return[...new Intl.Segmenter().segment(str)].length;
+  return[...str].length;
+}
+
+function limitGraphemes(str,max){
+  if(!str)return'';
+  if(typeof Intl!=='undefined'&&Intl.Segmenter){
+    const segs=[...new Intl.Segmenter().segment(str)];
+    return segs.slice(0,max).map(s=>s.segment).join('');
+  }
+  return[...str].slice(0,max).join('');
+}
+
+// ── DATA SYNC ──
 async function loadFromCloud(){
   refreshBtn.textContent = '↻ REFRESHING';
-  
   if (isDemo) {
     const saved = localStorage.getItem('afl_demo_data');
-    if (saved) {
-      allData = JSON.parse(saved);
-    } else {
-      ensureDefaultBoard();
-    }
-    syncStatus.textContent = 'local mode';
+    if (saved) allData = JSON.parse(saved);
+    else ensureDefaultBoard();
     finalizeLoad();
+    syncStatus.textContent = 'local mode';
     return;
   }
-
   try{
     syncStatus.textContent='syncing…';
     const res=await fetch(`${JSONBIN_URL}/latest?_t=${Date.now()}`,{headers:{'X-Master-Key':API_KEY},cache:'no-store'});
     if(res.ok){
       const data=await res.json();
-      const record=data.record||{};
-      if(!record.boards){
-        const id=genId();
-        allData={boards:{[id]:{name:'Main Team',roster:record}}};
-      }else{
-        allData=record;
-      }
+      allData=data.record||{boards:{}};
       localStorage.setItem('afl_data',JSON.stringify(allData));
       syncStatus.textContent='synced';
     }
@@ -371,9 +363,9 @@ async function loadFromCloud(){
 
 function finalizeLoad() {
   ensureDefaultBoard();
-  const savedCurrent=localStorage.getItem(isDemo ? 'afl_demo_current' : 'afl_current_board');
-  const firstId=getBoardIds()[0];
-  const startId=(savedCurrent&&allData.boards[savedCurrent])?savedCurrent:firstId;
+  const ids = getBoardIds();
+  const savedCurrent = localStorage.getItem(isDemo ? 'afl_demo_current' : 'afl_current_board');
+  const startId = (savedCurrent && allData.boards[savedCurrent]) ? savedCurrent : ids[0];
   setCurrentBoard(startId);
   rebuildTrack();
   renderAllBoards();
@@ -384,19 +376,15 @@ function finalizeLoad() {
 
 function saveToCloud(){
   if (isViewOnly) return; 
-
   allData.boards[currentBoardId].roster=roster;
-  
   if (isDemo) {
     localStorage.setItem('afl_demo_data', JSON.stringify(allData));
     localStorage.setItem('afl_demo_current', currentBoardId);
     syncStatus.textContent = 'saved locally';
     return;
   }
-
   localStorage.setItem('afl_data',JSON.stringify(allData));
   localStorage.setItem('afl_current_board',currentBoardId);
-  
   clearTimeout(saveTimer);
   saveTimer=setTimeout(async()=>{
     try{
@@ -407,97 +395,10 @@ function saveToCloud(){
   },500);
 }
 
-function rebuildTrack(){
-  const ids=getBoardIds();
-  while(boardTrack.children.length>ids.length) boardTrack.removeChild(boardTrack.lastChild);
-  while(boardTrack.children.length<ids.length){
-    const g=document.createElement('div');
-    g.className='ground';
-    boardTrack.appendChild(g);
-  }
-  const w=wrapper.clientWidth;
-  boardTrack.style.width=(w*ids.length)+'px';
-  [...boardTrack.children].forEach(g=>g.style.width=w+'px');
-  setTrackX(currentBoardIndex,false);
-}
-
-function setTrackX(index,animate){
-  const w=wrapper.clientWidth;
-  boardTrack.style.transition=animate?'transform 0.32s cubic-bezier(0.25,0.46,0.45,0.94)':'none';
-  boardTrack.style.transform=`translateX(${-index*w}px)`;
-}
-
-function snapToBoard(index,animate=true){
-  const ids=getBoardIds();
-  index=Math.max(0,Math.min(ids.length-1,index));
-  currentBoardIndex=index;
-  setTrackX(index,animate);
-  setCurrentBoard(ids[index]);
-  renderBoardMenu();
-  renderBoardIndicator();
-  localStorage.setItem(isDemo ? 'afl_demo_current' : 'afl_current_board', currentBoardId);
-  saveToCloud();
-}
-
-let trackSwipe=null;
-
-wrapper.addEventListener('pointerdown',e=>{
-  if(dragState||e.target.closest('.magnet')||e.target.closest('.pos-slot')) return;
-  trackSwipe={startX:e.clientX,lastX:e.clientX,pointerId:e.pointerId,baseX:-currentBoardIndex*wrapper.clientWidth,startTime:Date.now()};
-  boardTrack.style.transition='none';
-},{passive:true});
-
-wrapper.addEventListener('pointermove',e=>{
-  if(!trackSwipe||trackSwipe.pointerId!==e.pointerId)return;
-  const dx=e.clientX-trackSwipe.startX;
-  const ids=getBoardIds();
-  const w=wrapper.clientWidth;
-  let x=trackSwipe.baseX+dx;
-  if(x>0) x=x*0.25;
-  if(x<-(ids.length-1)*w) x=-(ids.length-1)*w+(x+(ids.length-1)*w)*0.25;
-  boardTrack.style.transform=`translateX(${x}px)`;
-  trackSwipe.lastX=e.clientX;
-},{passive:true});
-
-wrapper.addEventListener('pointerup',e=>{
-  if(!trackSwipe||trackSwipe.pointerId!==e.pointerId)return;
-  const sw=trackSwipe; trackSwipe=null;
-  const dx=e.clientX-sw.startX;
-  const dt=Date.now()-sw.startTime;
-  const velocity=dx/dt; 
-  const w=wrapper.clientWidth;
-  let targetIndex=currentBoardIndex;
-  if(Math.abs(dx)>w*0.3||Math.abs(velocity)>0.4){
-    if(dx<0) targetIndex++;
-    else targetIndex--;
-  }
-  suppressClick=true; setTimeout(()=>suppressClick=false,100);
-  snapToBoard(targetIndex);
-},{passive:true});
-
-function openBoardMenu(){boardMenuOverlay.classList.add('open');boardMenuEl.classList.add('open');}
-function closeBoardMenu(){boardMenuOverlay.classList.remove('open');boardMenuEl.classList.remove('open');newBoardForm.classList.remove('show');newBoardInput.value='';}
-
-function switchBoard(id){
-  const idx=getBoardIds().indexOf(id);
-  snapToBoard(idx);
-  rebuildTrack();
-  renderAllBoards();
-  closeBoardMenu();
-}
-
-function createBoard(name){
-  if (isViewOnly) return;
-  const id=genId();
-  allData.boards[id]={name:name.trim(),roster:{}};
-  switchBoard(id);
-}
-
+// ── UI RENDERING ──
 function renderBoardMenu(){
   boardListEl.innerHTML='';
-  if (isViewOnly) {
-    createBoardBtn.style.display = 'none';
-  }
+  if (isViewOnly) createBoardBtn.style.display = 'none';
   Object.entries(allData.boards).forEach(([id,board])=>{
     const item=document.createElement('div');
     item.className='board-item'+(id===currentBoardId?' active':'');
@@ -519,41 +420,48 @@ function renderBoardIndicator(){
   });
 }
 
-menuBtn.addEventListener('click',openBoardMenu);
-boardMenuOverlay.addEventListener('click',closeBoardMenu);
-createBoardBtn.addEventListener('click',()=>{
-  newBoardForm.classList.toggle('show');
-  if(newBoardForm.classList.contains('show'))setTimeout(()=>newBoardInput.focus(),50);
-});
-newBoardConfirm.addEventListener('click',()=>{const n=newBoardInput.value.trim();if(n)createBoard(n);});
-newBoardInput.addEventListener('keydown',e=>{if(e.key==='Enter'){const n=newBoardInput.value.trim();if(n)createBoard(n);}});
+function openBoardMenu(){
+  boardMenuOverlay.classList.add('open');
+  boardMenuEl.classList.add('open');
+}
+
+function closeBoardMenu(){
+  boardMenuOverlay.classList.remove('open');
+  boardMenuEl.classList.remove('open');
+  newBoardForm.classList.remove('show');
+  newBoardInput.value='';
+}
+
+function rebuildTrack(){
+  const ids=getBoardIds();
+  boardTrack.innerHTML = '';
+  ids.forEach(() => {
+    const g=document.createElement('div');
+    g.className='ground';
+    g.style.width = wrapper.clientWidth + 'px';
+    boardTrack.appendChild(g);
+  });
+  boardTrack.style.width=(wrapper.clientWidth*ids.length)+'px';
+  setTrackX(currentBoardIndex,false);
+}
 
 function drawOval(groundEl){
-  groundEl.querySelectorAll('svg.bg,.divider').forEach(e=>e.remove());
   const w=groundEl.clientWidth,h=groundEl.clientHeight;
   const cx=w*0.5,cy=h*0.38,rx=w*0.46,ry=h*0.37,sq=w*0.42;
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
   svg.classList.add('bg');svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
-  
   const lineCol='rgba(255,255,255,0.3)',strokeW='3';
   const goalH = 22, behindH = 14, postGap = 12;
-
   svg.innerHTML=`
     <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
-    
-    <!-- Top Goal Posts (Flipped Inside) -->
     <line x1="${cx - postGap * 1.5}" y1="${cy - ry}" x2="${cx - postGap * 1.5}" y2="${cy - ry + behindH}" stroke="${lineCol}" stroke-width="${strokeW}" />
     <line x1="${cx - postGap * 0.5}" y1="${cy - ry}" x2="${cx - postGap * 0.5}" y2="${cy - ry + goalH}" stroke="${lineCol}" stroke-width="${strokeW}" />
-    <line x1="${cx + postGap * 0.5}" y1="${cy - ry}" x2="${cx + postGap * 0.5}" y2="${cy + ry - goalH}" stroke="${lineCol}" stroke-width="${strokeW}" style="display:none;"/> <!-- Fixed typo -->
     <line x1="${cx + postGap * 0.5}" y1="${cy - ry}" x2="${cx + postGap * 0.5}" y2="${cy - ry + goalH}" stroke="${lineCol}" stroke-width="${strokeW}" />
     <line x1="${cx + postGap * 1.5}" y1="${cy - ry}" x2="${cx + postGap * 1.5}" y2="${cy - ry + behindH}" stroke="${lineCol}" stroke-width="${strokeW}" />
-
-    <!-- Bottom Goal Posts (Flipped Inside) -->
     <line x1="${cx - postGap * 1.5}" y1="${cy + ry}" x2="${cx - postGap * 1.5}" y2="${cy + ry - behindH}" stroke="${lineCol}" stroke-width="${strokeW}" />
     <line x1="${cx - postGap * 0.5}" y1="${cy + ry}" x2="${cx - postGap * 0.5}" y2="${cy + ry - goalH}" stroke="${lineCol}" stroke-width="${strokeW}" />
     <line x1="${cx + postGap * 0.5}" y1="${cy + ry}" x2="${cx + postGap * 0.5}" y2="${cy + ry - goalH}" stroke="${lineCol}" stroke-width="${strokeW}" />
     <line x1="${cx + postGap * 1.5}" y1="${cy + ry}" x2="${cx + postGap * 1.5}" y2="${cy + ry - behindH}" stroke="${lineCol}" stroke-width="${strokeW}" />
-
     <rect x="${cx-sq/2}" y="${cy-sq/2}" width="${sq}" height="${sq}" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
     <image href="https://aflnational.com/wp-content/uploads/2025/12/UNSW-Eastern-Suburbs-Bulldogs-AFL-footy-club-logo.png" x="${cx-36}" y="${cy-36}" height="72" width="72"/>
   `;
@@ -564,7 +472,7 @@ function drawOval(groundEl){
 }
 
 function renderBoard(boardId,groundEl){
-  groundEl.querySelectorAll('.zone-label,.pos-slot,.magnet,.divider').forEach(e=>e.remove());
+  groundEl.querySelectorAll('.zone-label,.pos-slot,.magnet,.divider,.bg').forEach(e=>e.remove());
   drawOval(groundEl);
   zones.forEach(z=>{
     const el=document.createElement('div');
@@ -573,18 +481,7 @@ function renderBoard(boardId,groundEl){
     el.textContent=z.label;
     groundEl.appendChild(el);
   });
-
   const boardRoster=allData.boards[boardId]?.roster||{};
-  const activeNames=[];
-  positions.forEach(p=>{
-    const data=boardRoster[p.id],name=typeof data==='object'?data.name:data;
-    if(name)activeNames.push({id:p.id,name:name.toLowerCase().trim()});
-  });
-  const warningIds=new Set();
-  activeNames.forEach(pA=>activeNames.forEach(pB=>{
-    if(pA.id!==pB.id&&(pB.name.includes(pA.name)||pA.name.includes(pB.name))){warningIds.add(pA.id);warningIds.add(pB.id);}
-  }));
-
   positions.forEach(p=>{
     const data=boardRoster[p.id],name=typeof data==='object'?data.name:data,badge=typeof data==='object'?data.badge:'';
     const slot=document.createElement('div');
@@ -592,15 +489,13 @@ function renderBoard(boardId,groundEl){
     slot.style.left=p.x+'%';slot.style.top=p.y+'%';
     if(!name){
       slot.innerHTML=`<span class="pos-label">${p.label}</span>`;
-      if (!isViewOnly) {
-        slot.onclick=()=>{if(!suppressClick)openEdit(p.id,boardId);};
-      }
+      if (!isViewOnly) slot.onclick=()=>{if(!suppressClick)openEdit(p.id,boardId);};
     }
     groundEl.appendChild(slot);
-
     if(name){
+      if (dragState && dragState.isTransitioning && dragState.originalPlayerName === name) return;
       const mag=document.createElement('div');
-      mag.className='magnet'+(warningIds.has(p.id)?' warning':'')+(p.bench?' is-bench':'');
+      mag.className='magnet'+(p.bench?' is-bench':'');
       mag.style.left=p.x+'%';mag.style.top=p.y+'%';
       const isEmg=p.id==='emg';
       const displayBadge=isEmg?'E':(badge||'');
@@ -609,24 +504,26 @@ function renderBoard(boardId,groundEl){
       mag.innerHTML=`<div class="mag-badge" style="font-size:${badgeFontSize};color:${badgeColor}">${displayBadge}</div><div class="mag-name">${name}</div>`;
       mag.dataset.posId=p.id;
       mag.dataset.boardId=boardId;
-      
       if (!isViewOnly) {
         mag.addEventListener('pointerdown',e=>{
           if(boardId!==currentBoardId)return;
           if(!e.isPrimary||e.button!==0)return;
           e.preventDefault();mag.setPointerCapture(e.pointerId);
           const gR=groundEl.getBoundingClientRect();
-          dragState={el:mag,posId:p.id,groundEl,moved:false,pointerId:e.pointerId,
-            startX:e.clientX,startY:e.clientY,
-            offX:e.clientX-(gR.left+(p.x/100)*gR.width),
-            offY:e.clientY-(gR.top+(p.y/100)*gR.height),
-            curX:p.x,curY:p.y,
-            nearRight:false,nearLeft:false,
-            rightTimer:null,leftTimer:null};
+          
+          dragState={
+            el:mag, posId:p.id, startBoardIndex: currentBoardIndex, groundEl, moved:false, pointerId:e.pointerId,
+            startX:e.clientX, startY:e.clientY,
+            offX: e.clientX - (gR.left + (p.x/100)*gR.width),
+            offY: e.clientY - (gR.top + (p.y/100)*gR.height),
+            curX:p.x, curY:p.y,
+            originalPlayerName: name, 
+            lastScrollOffset: 0,
+            hasLanded: false,
+            currentLogicalIndex: currentBoardIndex
+          };
         });
-      } else {
-        mag.style.cursor = 'default';
-      }
+      } else { mag.style.cursor = 'default'; }
       groundEl.appendChild(mag);
     }
   });
@@ -639,57 +536,112 @@ function renderAllBoards(){
   });
 }
 
-function renderCurrentBoard(){
-  const groundEl=boardTrack.children[currentBoardIndex];
-  if(groundEl) renderBoard(currentBoardId,groundEl);
+function setTrackX(index, animate, offsetPx = 0){
+  const w=wrapper.clientWidth;
+  boardTrack.style.transition = animate ? 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)' : 'none';
+  boardTrack.style.transform = `translateX(${-index * w + offsetPx}px)`;
+}
+
+function snapToBoard(index, animate = true){
+  const ids = getBoardIds();
+  index = Math.max(0, Math.min(ids.length-1, index));
+  currentBoardIndex = index;
+  setTrackX(index, animate);
+  setCurrentBoard(ids[index]);
+  renderBoardMenu();
+  renderBoardIndicator();
+  localStorage.setItem(isDemo ? 'afl_demo_current' : 'afl_current_board', currentBoardId);
+}
+
+// ── CARRY TRANSITION LOGIC ──
+function logicalTransfer(direction) {
+  if (!dragState) return;
+  const ds = dragState;
+  const ids = getBoardIds();
+  const nextIdx = ds.currentLogicalIndex + direction;
+  if (nextIdx < 0 || nextIdx >= ids.length) return;
+
+  const prevId = ids[ds.currentLogicalIndex];
+  const nextId = ids[nextIdx];
+  const targetRoster = allData.boards[nextId].roster;
+  let finalPosId = null;
+
+  // Find slot on new board
+  if (!targetRoster[ds.posId]) finalPosId = ds.posId;
+  else {
+    const emptyBench = positions.find(p => p.bench && !targetRoster[p.id]);
+    if (emptyBench) finalPosId = emptyBench.id;
+  }
+
+  if (finalPosId) {
+    const playerData = allData.boards[prevId].roster[ds.posId];
+    delete allData.boards[prevId].roster[ds.posId];
+    targetRoster[finalPosId] = playerData;
+    
+    // Reparent visually
+    ds.groundEl = boardTrack.children[nextIdx];
+    ds.groundEl.appendChild(ds.el);
+
+    // Update logical tracking
+    ds.currentLogicalIndex = nextIdx;
+    ds.posId = finalPosId;
+    currentBoardId = nextId;
+    currentBoardIndex = nextIdx;
+    roster = targetRoster;
+    
+    // Update UI elements
+    activeBoardNameEl.textContent = allData.boards[nextId].name;
+    renderBoardIndicator();
+    saveToCloud();
+  }
 }
 
 const onMove=e=>{
   if(!dragState||dragState.pointerId!==e.pointerId)return;
+  
   const dx=e.clientX-dragState.startX,dy=e.clientY-dragState.startY;
-  if(!dragState.moved&&(dx*dx+dy*dy > 64)){dragState.moved=true;}
+  if(!dragState.moved&&(dx*dx+dy*dy > 64)) dragState.moved=true;
+  
   if(dragState.moved){
-    const gR=dragState.groundEl.getBoundingClientRect();
-    const x=((e.clientX-dragState.offX-gR.left)/gR.width)*100;
-    const y=((e.clientY-dragState.offY-gR.top)/gR.height)*100;
-    dragState.curX=Math.max(0,Math.min(100,x));
-    dragState.curY=Math.max(0,Math.min(100,y));
-    dragState.el.style.left=dragState.curX+'%';
-    dragState.el.style.top=dragState.curY+'%';
-
-    const isInRightZone=e.clientX>window.innerWidth*0.90;
-    const isInLeftZone=e.clientX<window.innerWidth*0.10;
+    const wRect = wrapper.getBoundingClientRect();
+    const W = wRect.width;
+    const edgeZone = W * 0.10;
     
-    if(isInRightZone){
-      if(!dragState.rightTimer){
-        dragState.rightTimer = setTimeout(()=>{
-          dragState.nearRight = true;
-          edgeIndicatorRight.classList.add('show');
-        }, 1200);
-      }
-    } else {
-      if(dragState.rightTimer){
-        clearTimeout(dragState.rightTimer);
-        dragState.rightTimer = null;
-      }
-      dragState.nearRight = false;
-      edgeIndicatorRight.classList.remove('show');
+    // ── PROPORTIONAL SCROLLING ──
+    let proportionalOffset = 0;
+    let transferTriggered = false;
+
+    if (e.clientX > wRect.right - edgeZone) {
+      // Finger in right zone
+      const depth = (e.clientX - (wRect.right - edgeZone)) / edgeZone;
+      proportionalOffset = -depth * W;
+      if (depth >= 1.0) transferTriggered = 1;
+    } else if (e.clientX < wRect.left + edgeZone) {
+      // Finger in left zone
+      const depth = ((wRect.left + edgeZone) - e.clientX) / edgeZone;
+      proportionalOffset = depth * W;
+      if (depth >= 1.0) transferTriggered = -1;
     }
 
-    if(isInLeftZone){
-      if(!dragState.leftTimer){
-        dragState.leftTimer = setTimeout(()=>{
-          dragState.nearLeft = true;
-          edgeIndicatorLeft.classList.add('show');
-        }, 1200);
-      }
-    } else {
-      if(dragState.leftTimer){
-        clearTimeout(dragState.leftTimer);
-        dragState.leftTimer = null;
-      }
-      dragState.nearLeft = false;
-      edgeIndicatorLeft.classList.remove('show');
+    // Apply Track Position
+    boardTrack.style.transition = 'none';
+    boardTrack.style.transform = `translateX(${-dragState.currentLogicalIndex * W + proportionalOffset}px)`;
+
+    // ── POSITION MAGNET ──
+    // Visual Origin is wherever the logically centered board currently is on screen
+    const boardVisualOriginX = wRect.left + proportionalOffset;
+    const x = ((e.clientX - dragState.offX - boardVisualOriginX) / W) * 100;
+    const y = ((e.clientY - dragState.offY - wRect.top) / wRect.height) * 100;
+    
+    dragState.curX = x;
+    dragState.curY = y;
+    dragState.el.style.left = x + '%';
+    dragState.el.style.top = y + '%';
+
+    // ── TRIGGER HANDOFF ──
+    // If the slide reaches 100% of board width, we center logic and reparent
+    if (transferTriggered !== false) {
+      logicalTransfer(transferTriggered);
     }
   }
 };
@@ -697,109 +649,135 @@ const onMove=e=>{
 const onEnd=e=>{
   if(!dragState||dragState.pointerId!==e.pointerId)return;
   dragState.el.releasePointerCapture(e.pointerId);
+  const ds=dragState; 
+  dragState=null;
+
+  if(!ds.moved){ 
+    openEdit(ds.posId, currentBoardId); 
+    return; 
+  }
   
-  clearTimeout(dragState.rightTimer);
-  clearTimeout(dragState.leftTimer);
+  // Center the current board index
+  snapToBoard(currentBoardIndex, true);
   
-  edgeIndicatorRight.classList.remove('show');
-  edgeIndicatorLeft.classList.remove('show');
-  const ds=dragState;dragState=null;
+  // Find snap point on current board
+  let best=null, bd=Infinity;
+  const snapX = Math.max(0, Math.min(100, ds.curX));
+  positions.forEach(p=>{
+    const ddx=snapX-p.x, ddy=ds.curY-p.y, d=ddx*ddx+ddy*ddy;
+    if(d<bd){ bd=d; best=p; }
+  });
 
-  if(!ds.moved){openEdit(ds.posId,currentBoardId);return;}
-
-  if(ds.nearRight || ds.nearLeft){
-    const ids=getBoardIds();
-    const direction = ds.nearRight ? 1 : -1;
-    const nextIdx = currentBoardIndex + direction;
-
-    if(nextIdx >= 0 && nextIdx < ids.length){
-      const nextId = ids[nextIdx];
-      const targetRoster = allData.boards[nextId].roster;
-      let finalPosId = null;
-
-      if(!targetRoster[ds.posId]){
-        finalPosId = ds.posId;
-      } else {
-        const emptyBench = positions.find(p => p.bench && !targetRoster[p.id]);
-        if(emptyBench) finalPosId = emptyBench.id;
-      }
-
-      if(finalPosId) {
-        const playerData = roster[ds.posId];
-        delete roster[ds.posId];
-        targetRoster[finalPosId] = playerData;
-        
-        saveToCloud();
-        renderCurrentBoard(); 
-        snapToBoard(nextIdx);
-        renderBoard(nextId, boardTrack.children[nextIdx]);
-      } else {
-        showMessage("BOARD FULL");
-        renderCurrentBoard();
-      }
-      return;
+  if(best && bd < 500){
+    const dData = allData.boards[currentBoardId].roster[ds.posId];
+    if(allData.boards[currentBoardId].roster[best.id]) {
+      allData.boards[currentBoardId].roster[ds.posId]=allData.boards[currentBoardId].roster[best.id];
+    } else {
+      delete allData.boards[currentBoardId].roster[ds.posId];
     }
+    allData.boards[currentBoardId].roster[best.id]=dData;
   }
-
-  let best=null,bd=Infinity;
-  positions.forEach(p=>{const ddx=ds.curX-p.x,ddy=ds.curY-p.y,d=ddx*ddx+ddy*ddy;if(d<bd){bd=d;best=p;}});
-  if(best&&bd<350){
-    const dData=roster[ds.posId];
-    if(roster[best.id])roster[ds.posId]=roster[best.id];else delete roster[ds.posId];
-    roster[best.id]=dData;
-  }
-  saveToCloud();renderCurrentBoard();
+  saveToCloud(); renderAllBoards(); 
 };
-document.onpointermove=onMove;document.onpointerup=onEnd;
 
+document.onpointermove=onMove; document.onpointerup=onEnd;
+
+// ── EDITING ──
 function openEdit(posId,boardId){
   if (isViewOnly) return;
   editingPosId={posId,boardId};
   const data=allData.boards[boardId]?.roster[posId];
-  editTitle.textContent=positions.find(x=>x.id===posId).label;
+  const posLabel = positions.find(x=>x.id===posId).label;
+  editTitle.textContent=posLabel;
   editInput.value=typeof data==='object'?data.name:(data||'');
   badgeInput.value=typeof data==='object'?data.badge:'';
-  overlay.classList.add('show');setTimeout(()=>{editInput.focus();editInput.select();},50);
+  overlay.classList.add('show'); setTimeout(()=>{editInput.focus();editInput.select();},50);
 }
-function closeEdit(){overlay.classList.remove('show');editingPosId=null;}
 
+function closeEdit(){overlay.classList.remove('show'); editingPosId=null;}
 editSave.addEventListener('click',()=>{
   if(!editingPosId)return;
   const {posId,boardId}=editingPosId;
   const name=editInput.value.trim(),badge=limitGraphemes(badgeInput.value.trim(),2);
   const r=allData.boards[boardId].roster;
-  if(name)r[posId]={name,badge};else delete r[posId];
-  if(boardId===currentBoardId)roster=r;
-  saveToCloud();
-  renderBoard(boardId,boardTrack.children[getBoardIds().indexOf(boardId)]);
-  closeEdit();
+  if(name)r[posId]={name,badge}; else delete r[posId];
+  saveToCloud(); renderBoard(boardId,boardTrack.children[getBoardIds().indexOf(boardId)]); closeEdit();
 });
 editClear.addEventListener('click',()=>{
   if(!editingPosId)return;
   const {posId,boardId}=editingPosId;
   delete allData.boards[boardId].roster[posId];
-  if(boardId===currentBoardId)roster=allData.boards[boardId].roster;
-  saveToCloud();
-  renderBoard(boardId,boardTrack.children[getBoardIds().indexOf(boardId)]);
-  closeEdit();
+  saveToCloud(); renderBoard(boardId,boardTrack.children[getBoardIds().indexOf(boardId)]); closeEdit();
 });
 editCancel.addEventListener('click',closeEdit);
 editInput.addEventListener('keydown',e=>{if(e.key==='Enter')editSave.click();});
-
 refreshBtn.addEventListener('click',loadFromCloud);
-window.addEventListener('resize',()=>{rebuildTrack();renderAllBoards();});
+window.addEventListener('resize',()=>{rebuildTrack(); renderAllBoards();});
 
-// ── Initialization Logic ──
+function switchBoard(id){
+  const idx=getBoardIds().indexOf(id);
+  snapToBoard(idx);
+  closeBoardMenu();
+}
+
+function createBoard(name){
+  if (isViewOnly) return;
+  const id=genId();
+  allData.boards[id]={name:name.trim(),roster:{}};
+  switchBoard(id);
+}
+
+// ── SWIPE GESTURE ──
+let trackSwipeState=null;
+wrapper.addEventListener('pointerdown',e=>{
+  if(dragState||e.target.closest('.magnet')||e.target.closest('.pos-slot')) return;
+  trackSwipeState={startX:e.clientX,lastX:e.clientX,pointerId:e.pointerId,baseX:-currentBoardIndex*wrapper.clientWidth,startTime:Date.now()};
+  boardTrack.style.transition='none';
+},{passive:true});
+
+wrapper.addEventListener('pointermove',e=>{
+  if(!trackSwipeState||trackSwipeState.pointerId!==e.pointerId)return;
+  const dx=e.clientX-trackSwipeState.startX;
+  const ids=getBoardIds();
+  const w=wrapper.clientWidth;
+  let x=trackSwipeState.baseX+dx;
+  if(x>0) x=x*0.25;
+  if(x<-(ids.length-1)*w) x=-(ids.length-1)*w+(x+(ids.length-1)*w)*0.25;
+  boardTrack.style.transform=`translateX(${x}px)`;
+  trackSwipeState.lastX=e.clientX;
+},{passive:true});
+
+wrapper.addEventListener('pointerup',e=>{
+  if(!trackSwipeState||trackSwipeState.pointerId!==e.pointerId)return;
+  const sw=trackSwipeState; trackSwipeState=null;
+  const dx=e.clientX-sw.startX;
+  const dt=Date.now()-sw.startTime;
+  const velocity=dx/dt; 
+  const w=wrapper.clientWidth;
+  let targetIndex=currentBoardIndex;
+  if(Math.abs(dx)>w*0.3||Math.abs(velocity)>0.4){
+    if(dx<0) targetIndex++;
+    else targetIndex--;
+  }
+  suppressClick=true; setTimeout(()=>suppressClick=false,100);
+  snapToBoard(targetIndex);
+},{passive:true});
+
+menuBtn.addEventListener('click',openBoardMenu);
+boardMenuOverlay.addEventListener('click',closeBoardMenu);
+createBoardBtn.addEventListener('click',()=>{
+  newBoardForm.classList.toggle('show');
+  if(newBoardForm.classList.contains('show'))setTimeout(()=>newBoardInput.focus(),50);
+});
+newBoardConfirm.addEventListener('click',()=>{const n=newBoardInput.value.trim();if(n)createBoard(n);});
+newBoardInput.addEventListener('keydown',e=>{if(e.key==='Enter'){const n=newBoardInput.value.trim();if(n)createBoard(n);}});
+
+// ── INIT ──
 function init() {
   updateBadge();
-  if (isEdit) {
-    // Check if browser already has a saved login
-    if (localStorage.getItem('afl_coach_verified') === 'true') {
-      loadFromCloud();
-    } else {
-      pwOverlay.classList.add('show');
-      pwInput.focus();
-    }
+  if (isEdit && localStorage.getItem('afl_coach_verified') !== 'true') {
+    pwOverlay.classList.add('show');
+    pwInput.focus();
   } else {
     loadFromCloud();
   }
@@ -807,21 +785,15 @@ function init() {
 
 pwSubmit.onclick = () => {
   if (pwInput.value === 'Yadz') {
-    // Save to browser so user doesn't have to enter again
     localStorage.setItem('afl_coach_verified', 'true');
-    pwOverlay.classList.remove('show');
+    pwOverlay.classList.remove('show'); 
     loadFromCloud();
   } else {
     showMessage("INCORRECT PASSWORD");
-    // Switch to view only if they fail
-    isEdit = false;
-    isViewOnly = true;
-    pwOverlay.classList.remove('show');
-    updateBadge();
-    loadFromCloud();
+    isEdit = false; isViewOnly = true;
+    pwOverlay.classList.remove('show'); updateBadge(); loadFromCloud();
   }
 };
-
 pwInput.onkeydown = e => { if(e.key === 'Enter') pwSubmit.onclick(); };
 
 init();
