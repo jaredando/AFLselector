@@ -56,8 +56,8 @@
   .magnet{z-index:50;background:#fff;color:#073175;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;display:flex;align-items:center;padding:0 4px 0 16px;cursor:grab;box-shadow:0 2px 6px rgba(0,0,0,0.3);white-space:nowrap;transition:color 0.2s ease;}
   .magnet.warning{color:#b00000!important;}
   .mag-name{width:100%;text-align:left;overflow:hidden;text-overflow:ellipsis;}
-  .is-bench{width:60px!important;font-size:12px!important;padding:0 2px 0 12px!important;}
-  .pos-slot.is-bench{width:70px!important;}
+  .magnet.is-bench{width:60px!important;font-size:12px!important;padding:0 2px 0 12px!important;}
+  .pos-slot.is-bench{width:70px!important;padding:0 !important;}
   .mag-badge{position:absolute;left:-10px;top:50%;transform:translateY(-50%);width:22px;height:22px;background:#6786b8;border-radius:50%;border:1.5px solid #fff;display:flex;justify-content:center;align-items:center;color:#fff;font-weight:700;box-shadow:1px 0 3px rgba(0,0,0,0.1);line-height:1;}
 
   /* ── Edge carry indicators ── */
@@ -125,7 +125,7 @@
   #refreshBtn{background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#aaa;font-family:'Barlow Condensed',sans-serif;font-size:10px;padding:3px 7px;border-radius:4px;cursor:pointer;height:28px;}
 
   /* ── Sync & indicators ── */
-  #syncStatus{position:absolute;bottom:10px;right:10px;z-index:100;font-size:9px;color:rgba(255,255,255,0.3);}
+  #syncStatus{position:absolute;bottom:10px;right:14px;z-index:100;font-size:9px;color:rgba(255,255,255,0.3);}
   #boardIndicator{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);z-index:100;display:flex;gap:7px;align-items:center;}
   .board-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.2);transition:background 0.2s,transform 0.2s;}
   .board-dot.active{background:rgba(255,255,255,0.75);transform:scale(1.4);}
@@ -187,11 +187,11 @@
   .inv-slot.filled{border:none;background:transparent;pointer-events:none;}
   /* Chevron arrows */
   .inv-arrows{
-    position:absolute;left:8%;right:8%;top:93%;
+    position:absolute;left:8%;right:8%;top:91.5%;
     display:flex;justify-content:space-between;z-index:20;
     cursor:pointer;color:rgba(255,255,255,0.28);
     pointer-events:auto;user-select:none;touch-action:none;
-    align-items:center;padding:4px 0;
+    align-items:center;padding:8px 0;
   }
   .inv-arrows span{
     display:inline-block;width:9px;height:9px;
@@ -201,6 +201,15 @@
     transition:transform 0.3s ease,color 0.2s;
   }
   .inv-arrows.open span{transform:rotate(-135deg);color:rgba(96,165,250,0.75);}
+
+  /* ── No UI Mode ── */
+  body.no-ui #topBar,
+  body.no-ui #boardIndicator,
+  body.no-ui #syncStatus,
+  body.no-ui .inv-arrows,
+  body.no-ui .edge-indicator {
+    display: none !important;
+  }
 </style>
 </head>
 <body>
@@ -269,6 +278,7 @@ const urlParams = new URLSearchParams(window.location.search);
 let isViewOnly = urlParams.has('view'); 
 let isDemo = urlParams.has('demo');     
 let isEdit = urlParams.has('edit'); 
+let isNoUI = urlParams.has('noUI'); 
 
 const BIN_ID='69de398f856a68218931e5ea';
 const API_KEY='$2a$10$pzhEn9dwvvZP9ycmWjqIqOxQXIwhs.wWSOnj6BZv5SltQmU.XKXR6';
@@ -843,6 +853,8 @@ const onEnd=e=>{
   dragState=null;
 
   if(!ds.moved){
+    suppressClick = true;
+    setTimeout(() => suppressClick = false, 350);
     if(ds.fromInventory){ renderInventory(currentBoardId); openInventoryEdit(ds.invId,currentBoardId); }
     else openEdit(ds.posId,currentBoardId);
     return;
@@ -945,7 +957,8 @@ function openEdit(posId,boardId){
 }
 
 function closeEdit(){overlay.classList.remove('show'); editingPosId=null;}
-editSave.addEventListener('click',()=>{
+editSave.addEventListener('click', e => {
+  if(suppressClick && e.isTrusted) return;
   if(!editingPosId)return;
   const {posId,boardId,isInventory}=editingPosId;
   const name=editInput.value.trim(),badge=limitGraphemes(badgeInput.value.trim(),2);
@@ -961,7 +974,8 @@ editSave.addEventListener('click',()=>{
   }
   closeEdit();
 });
-editClear.addEventListener('click',()=>{
+editClear.addEventListener('click', e => {
+  if(suppressClick && e.isTrusted) return;
   if(!editingPosId)return;
   const {posId,boardId,isInventory}=editingPosId;
   if(isInventory){
@@ -973,7 +987,10 @@ editClear.addEventListener('click',()=>{
   }
   closeEdit();
 });
-editCancel.addEventListener('click',closeEdit);
+editCancel.addEventListener('click', e => {
+  if(suppressClick && e.isTrusted) return;
+  closeEdit();
+});
 editInput.addEventListener('keydown',e=>{if(e.key==='Enter')editSave.click();});
 refreshBtn.addEventListener('click',loadFromCloud);
 window.addEventListener('resize',()=>{rebuildTrack(); renderAllBoards();});
@@ -1038,6 +1055,7 @@ newBoardInput.addEventListener('keydown',e=>{if(e.key==='Enter'){const n=newBoar
 
 // ── INIT ──
 function init() {
+  if (isNoUI) document.body.classList.add('no-ui');
   updateBadge();
   if (isEdit && localStorage.getItem('afl_coach_verified') !== 'true') {
     pwOverlay.classList.add('show');
