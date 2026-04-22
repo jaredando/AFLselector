@@ -24,8 +24,10 @@
     position:relative;
     width:100%; max-width:500px;
     height:100%; max-height:900px;
-    overflow:hidden;
+    overflow:visible;
+    clip-path:inset(0 0 0 0);
     transform:translateY(5%);
+    transition:transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94), clip-path 0.35s cubic-bezier(0.25,0.46,0.45,0.94);
   }
   #boardTrack{
     display:flex; flex-direction:row;
@@ -49,12 +51,12 @@
   /* ── Position slots & magnets ── */
   .pos-slot,.magnet{position:absolute;transform:translate(calc(-50% + 5px),-50%);z-index:3;width:70px;height:20px;border-radius:2px;}
   .pos-slot{width:80px;transform:translate(-50%,-50%);border:1px dashed rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;cursor:pointer;background:rgba(255,255,255,0.01);}
-  .pos-slot .pos-label{font-size:8px;color:rgba(255,255,255,0.2);text-transform:uppercase;font-weight:bold;}
+  .pos-slot .pos-label{font-size:8px;color:rgba(255,255,255,0.2);text-transform:uppercase;font-weight:bold;line-height:1;display:block;text-align:center;}
   .pos-slot.filled{border:none;background:transparent;pointer-events:none}
-  .magnet{z-index:50;background:#fff;color:#073175;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11.5px;display:flex;align-items:center;padding:0 4px 0 16px;cursor:grab;box-shadow:0 2px 6px rgba(0,0,0,0.3);white-space:nowrap;transition:color 0.2s ease;}
+  .magnet{z-index:50;background:#fff;color:#073175;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;display:flex;align-items:center;padding:0 4px 0 16px;cursor:grab;box-shadow:0 2px 6px rgba(0,0,0,0.3);white-space:nowrap;transition:color 0.2s ease;}
   .magnet.warning{color:#b00000!important;}
   .mag-name{width:100%;text-align:left;overflow:hidden;text-overflow:ellipsis;}
-  .is-bench{width:60px!important;font-size:10.5px!important;padding:0 2px 0 12px!important;}
+  .is-bench{width:60px!important;font-size:12px!important;padding:0 2px 0 12px!important;}
   .pos-slot.is-bench{width:70px!important;}
   .mag-badge{position:absolute;left:-10px;top:50%;transform:translateY(-50%);width:22px;height:22px;background:#6786b8;border-radius:50%;border:1.5px solid #fff;display:flex;justify-content:center;align-items:center;color:#fff;font-weight:700;box-shadow:1px 0 3px rgba(0,0,0,0.1);line-height:1;}
 
@@ -114,7 +116,7 @@
   }
 
   /* ── Mode Badge ── */
-  #modeBadge{position:absolute; top:42px; left:50%; transform:translateX(-50%); font-size:9px; color:rgba(255,255,255,0.4); letter-spacing:2px; z-index:101; text-transform:uppercase; pointer-events:none;}
+  #modeBadge{position:absolute; top:32px; left:50%; transform:translateX(-50%); font-size:9px; color:rgba(255,255,255,0.4); letter-spacing:2px; z-index:101; text-transform:uppercase; pointer-events:none;}
 
   /* ── Top bar ── */
   #topBar{position:absolute;top:10px;left:10px;right:10px;z-index:100;display:flex;align-items:center;justify-content:space-between;}
@@ -159,6 +161,46 @@
   #editBox button{flex:1;height:40px;border:none;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;cursor:pointer;}
   #editBox .save-btn{background:#3b82f6;color:#fff}
   #editBox .clear-btn{background:#374151;color:#fff}
+
+  /* ── Inventory ── */
+  #inventoryPanel{
+    position:absolute;bottom:0;left:0;right:0;
+    height:30dvh;z-index:50;overflow:hidden;
+    background:
+      rgba(0,0,0,0.28),
+      repeating-linear-gradient(45deg,rgba(255,255,255,0.04) 0px,rgba(255,255,255,0.04) 2px,transparent 2px,transparent 14px),
+      #073175;
+    border-top:1px solid rgba(255,255,255,0.14);
+    transform:translateY(100%);
+    transition:transform 0.35s cubic-bezier(0.25,0.46,0.45,0.94);
+  }
+  #inventoryPanel.open{transform:translateY(0);}
+  #inventoryLabel{position:absolute;top:4px;left:50%;transform:translateX(-50%);font-family:'Bebas Neue',sans-serif;font-size:10px;letter-spacing:3px;color:rgba(255,255,255,0.2);pointer-events:none;}
+  .inv-slot{
+    position:absolute;transform:translate(-50%,-50%);
+    width:70px;height:20px;border-radius:2px;
+    border:1px dashed rgba(255,255,255,0.15);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;background:rgba(255,255,255,0.01);
+  }
+  .inv-slot .pos-label{font-size:8px;color:rgba(255,255,255,0.2);text-transform:uppercase;font-weight:bold;line-height:1;display:block;text-align:center;}
+  .inv-slot.filled{border:none;background:transparent;pointer-events:none;}
+  /* Chevron arrows */
+  .inv-arrows{
+    position:absolute;left:8%;right:8%;top:93%;
+    display:flex;justify-content:space-between;z-index:20;
+    cursor:pointer;color:rgba(255,255,255,0.28);
+    pointer-events:auto;user-select:none;touch-action:none;
+    align-items:center;padding:4px 0;
+  }
+  .inv-arrows span{
+    display:inline-block;width:9px;height:9px;
+    border-right:1.5px solid currentColor;
+    border-bottom:1.5px solid currentColor;
+    transform:rotate(45deg);
+    transition:transform 0.3s ease,color 0.2s;
+  }
+  .inv-arrows.open span{transform:rotate(-135deg);color:rgba(96,165,250,0.75);}
 </style>
 </head>
 <body>
@@ -180,6 +222,8 @@
 
   <!-- Global Message Overlay -->
   <div id="toastOverlay"></div>
+  <!-- Inventory panel -->
+  <div id="inventoryPanel"><div id="inventoryLabel">EXTRA BENCH</div></div>
 </div>
 
 <!-- Password Overlay -->
@@ -266,11 +310,12 @@ const positions=[
   {id:'mr',x:74,y:36,label:'MID'},{id:'rw',x:88,y:32,label:'RW'},
   {id:'hbl',x:18,y:59,label:'HB'},{id:'chb',x:50,y:61,label:'CHB'},{id:'hbr',x:82,y:59,label:'HB'},
   {id:'bpl',x:22,y:70,label:'BP'},{id:'fb',x:50,y:72,label:'FB'},{id:'bpr',x:78,y:70,label:'BP'},
-  {id:'ic1',x:10,y:81,label:'IC',bench:true},{id:'ic2',x:30,y:81,label:'IC',bench:true},
-  {id:'ic3',x:50,y:81,label:'IC',bench:true},{id:'ic4',x:70,y:81,label:'IC',bench:true},
-  {id:'emg',x:90,y:81,label:'EMG',bench:true},
+  {id:'ic1',x:10,y:80,label:'IC',bench:true},{id:'ic2',x:30,y:80,label:'IC',bench:true},
+  {id:'ic3',x:50,y:80,label:'IC',bench:true},{id:'ic4',x:70,y:80,label:'IC',bench:true},
+  {id:'emg',x:90,y:80,label:'EMG',bench:true},
   {id:'e1',x:10,y:84,label:'---',bench:true},{id:'e2',x:30,y:84,label:'---',bench:true},{id:'e3',x:50,y:84,label:'---',bench:true},{id:'e4',x:70,y:84,label:'---',bench:true},{id:'e5',x:90,y:84,label:'---',bench:true},
   {id:'e6',x:10,y:87,label:'---',bench:true},{id:'e7',x:30,y:87,label:'---',bench:true},{id:'e8',x:50,y:87,label:'---',bench:true},{id:'e9',x:70,y:87,label:'---',bench:true},{id:'e10',x:90,y:87,label:'---',bench:true},
+  {id:'e11',x:10,y:90,label:'---',bench:true},{id:'e12',x:30,y:90,label:'---',bench:true},{id:'e13',x:50,y:90,label:'---',bench:true},{id:'e14',x:70,y:90,label:'---',bench:true},{id:'e15',x:90,y:90,label:'---',bench:true},
 ];
 const zones=[{label:'FORWARD',y:9.5},{label:'MIDFIELD',y:31},{label:'DEFENCE',y:66}];
 
@@ -279,6 +324,14 @@ let currentBoardId=null;
 let currentBoardIndex=0;
 let roster={};
 let saveTimer=null,editingPosId=null,dragState=null,suppressClick=false;
+let autoRefreshInterval=null;
+let isDirty=false;
+let isSaving=false;
+let inventoryOpen=false;
+const INV_COLS=[10,30,50,70,90];
+const INV_ROWS=[13,25,37,49,61,73,85];
+const inventorySlots=[];
+for(let r=0;r<INV_ROWS.length;r++) for(let c=0;c<INV_COLS.length;c++) inventorySlots.push({id:`inv${r*5+c}`,x:INV_COLS[c],y:INV_ROWS[r]});
 
 // ── HELPERS ──
 function genId(){return'b_'+Date.now();}
@@ -287,7 +340,7 @@ function getBoardIds(){return Object.keys(allData.boards);}
 function ensureDefaultBoard(){
   if(getBoardIds().length===0){
     const id=genId();
-    allData.boards[id]={name:'Main Team',roster:{}};
+    allData.boards[id]={name:'Main Team',roster:{},inventory:{}};
   }
 }
 
@@ -350,6 +403,7 @@ async function loadFromCloud(){
     if(res.ok){
       const data=await res.json();
       allData=data.record||{boards:{}};
+      isDirty=false;
       localStorage.setItem('afl_data',JSON.stringify(allData));
       syncStatus.textContent='synced';
     }
@@ -372,10 +426,11 @@ function finalizeLoad() {
   renderBoardMenu();
   renderBoardIndicator();
   refreshBtn.textContent = '↻ REFRESH';
+  startAutoRefresh();
 }
 
 function saveToCloud(){
-  if (isViewOnly) return; 
+  if (isViewOnly) return;
   allData.boards[currentBoardId].roster=roster;
   if (isDemo) {
     localStorage.setItem('afl_demo_data', JSON.stringify(allData));
@@ -383,16 +438,143 @@ function saveToCloud(){
     syncStatus.textContent = 'saved locally';
     return;
   }
+  isDirty=true;
   localStorage.setItem('afl_data',JSON.stringify(allData));
   localStorage.setItem('afl_current_board',currentBoardId);
   clearTimeout(saveTimer);
-  saveTimer=setTimeout(async()=>{
-    try{
-      syncStatus.textContent='saving…';
-      await fetch(JSONBIN_URL,{method:'PUT',headers:{'Content-Type':'application/json','X-Master-Key':API_KEY},body:JSON.stringify(allData)});
+  saveTimer=setTimeout(()=>pushToCloud(false), 500);
+}
+
+async function pushToCloud(keepalive=false){
+  saveTimer=null;
+  isSaving=true;
+  syncStatus.textContent='saving…';
+  try{
+    const res=await fetch(JSONBIN_URL,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json','X-Master-Key':API_KEY},
+      body:JSON.stringify(allData),
+      keepalive
+    });
+    if(res.ok){
+      isDirty=false;
+      isSaving=false;
       syncStatus.textContent='saved';
-    }catch(e){syncStatus.textContent='offline';}
-  },500);
+    } else {
+      throw new Error('HTTP '+res.status);
+    }
+  }catch(e){
+    isSaving=false;
+    syncStatus.textContent='save failed – retrying…';
+    saveTimer=setTimeout(()=>pushToCloud(false), 5000);
+  }
+}
+
+// Flush any pending save when the user switches away or closes the tab.
+// keepalive:true lets the browser complete the request even as the page unloads.
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden'&&(isDirty||saveTimer)){
+    clearTimeout(saveTimer);
+    pushToCloud(true);
+  }
+});
+
+async function silentRefresh(){
+  if(isDemo||isDirty||isSaving)return;
+  try{
+    const res=await fetch(`${JSONBIN_URL}/latest?_t=${Date.now()}`,{headers:{'X-Master-Key':API_KEY},cache:'no-store'});
+    if(res.ok){
+      const data=await res.json();
+      allData=data.record||{boards:{}};
+      localStorage.setItem('afl_data',JSON.stringify(allData));
+      ensureDefaultBoard();
+      if(allData.boards[currentBoardId]) roster=allData.boards[currentBoardId].roster;
+      renderAllBoards();
+      renderBoardMenu();
+      renderBoardIndicator();
+      if(inventoryOpen) renderInventory(currentBoardId);
+      syncStatus.textContent='synced';
+    }
+  }catch(e){}
+}
+
+function startAutoRefresh(){
+  clearInterval(autoRefreshInterval);
+  if(isDemo)return;
+  autoRefreshInterval=setInterval(()=>{
+    if(!dragState&&!isDirty&&!isSaving) silentRefresh();
+  },15000);
+}
+
+// ── INVENTORY ──
+function toggleInventory(){
+  inventoryOpen=!inventoryOpen;
+  document.getElementById('inventoryPanel').classList.toggle('open',inventoryOpen);
+  wrapper.style.transform=inventoryOpen?'translateY(calc(5% - 30dvh))':'translateY(5%)';
+  wrapper.style.clipPath=inventoryOpen?'inset(0 0 -30dvh 0)':'inset(0 0 0 0)';
+  document.querySelectorAll('.inv-arrows').forEach(el=>el.classList.toggle('open',inventoryOpen));
+  if(inventoryOpen) renderInventory(currentBoardId);
+}
+
+function renderInventory(boardId){
+  const panel=document.getElementById('inventoryPanel');
+  panel.querySelectorAll('.inv-slot,.magnet').forEach(e=>e.remove());
+  if(!allData.boards[boardId]) return;
+  if(!allData.boards[boardId].inventory) allData.boards[boardId].inventory={};
+  const inv=allData.boards[boardId].inventory;
+  inventorySlots.forEach(s=>{
+    const data=inv[s.id];
+    const name=typeof data==='object'?data.name:data;
+    const badge=typeof data==='object'?data.badge:'';
+    const slot=document.createElement('div');
+    slot.className='inv-slot'+(name?' filled':'');
+    slot.style.left=s.x+'%';slot.style.top=s.y+'%';
+    if(!name){
+      slot.innerHTML=`<span class="pos-label">---</span>`;
+      if(!isViewOnly) slot.onclick=()=>openInventoryEdit(s.id,boardId);
+    }
+    panel.appendChild(slot);
+    if(name){
+      const mag=document.createElement('div');
+      mag.className='magnet is-bench';
+      mag.style.left=s.x+'%';mag.style.top=s.y+'%';
+      const badgeFontSize=(graphemeCount(badge||'')===1)?'15px':'11px';
+      mag.innerHTML=`<div class="mag-badge" style="font-size:${badgeFontSize}">${badge||''}</div><div class="mag-name">${name}</div>`;
+      if(!isViewOnly){
+        mag.addEventListener('pointerdown',ev=>{
+          if(!ev.isPrimary||ev.button!==0)return;
+          ev.preventDefault();
+          mag.setPointerCapture(ev.pointerId);
+          const panelRect=panel.getBoundingClientRect();
+          const groundEl=boardTrack.children[currentBoardIndex];
+          const gR=groundEl.getBoundingClientRect();
+          groundEl.appendChild(mag);
+          dragState={
+            el:mag,posId:null,invId:s.id,fromInventory:true,
+            startBoardIndex:currentBoardIndex,groundEl,
+            moved:false,pointerId:ev.pointerId,
+            startX:ev.clientX,startY:ev.clientY,
+            offX:ev.clientX-(panelRect.left+(s.x/100)*panelRect.width),
+            offY:ev.clientY-(panelRect.top+(s.y/100)*panelRect.height),
+            curX:((ev.clientX-gR.left)/gR.width)*100,
+            curY:((ev.clientY-gR.top)/gR.height)*100,
+            originalPlayerName:name,lastScrollOffset:0,
+            hasLanded:false,currentLogicalIndex:currentBoardIndex
+          };
+        });
+      } else { mag.style.cursor='default'; }
+      panel.appendChild(mag);
+    }
+  });
+}
+
+function openInventoryEdit(slotId,boardId){
+  editingPosId={posId:slotId,boardId,isInventory:true};
+  const data=allData.boards[boardId]?.inventory?.[slotId];
+  editTitle.textContent='BENCH';
+  editInput.value=typeof data==='object'?data.name:(data||'');
+  badgeInput.value=typeof data==='object'?data.badge:'';
+  overlay.classList.add('show');setTimeout(()=>{editInput.focus();editInput.select();},50);
 }
 
 // ── UI RENDERING ──
@@ -472,7 +654,7 @@ function drawOval(groundEl){
 }
 
 function renderBoard(boardId,groundEl){
-  groundEl.querySelectorAll('.zone-label,.pos-slot,.magnet,.divider,.bg').forEach(e=>e.remove());
+  groundEl.querySelectorAll('.zone-label,.pos-slot,.magnet,.divider,.bg,.inv-arrows').forEach(e=>e.remove());
   drawOval(groundEl);
   zones.forEach(z=>{
     const el=document.createElement('div');
@@ -527,6 +709,13 @@ function renderBoard(boardId,groundEl){
       groundEl.appendChild(mag);
     }
   });
+  // Inventory toggle arrows
+  const arrows=document.createElement('div');
+  arrows.className='inv-arrows'+(inventoryOpen?' open':'');
+  arrows.innerHTML='<span></span><span></span><span></span><span></span><span></span><span></span>';
+  arrows.addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDefault();});
+  arrows.addEventListener('click',e=>{e.stopPropagation();if(boardId===currentBoardId)toggleInventory();});
+  groundEl.appendChild(arrows);
 }
 
 function renderAllBoards(){
@@ -551,6 +740,7 @@ function snapToBoard(index, animate = true){
   renderBoardMenu();
   renderBoardIndicator();
   localStorage.setItem(isDemo ? 'afl_demo_current' : 'afl_current_board', currentBoardId);
+  if(inventoryOpen) renderInventory(currentBoardId);
 }
 
 // ── CARRY TRANSITION LOGIC ──
@@ -649,38 +839,98 @@ const onMove=e=>{
 const onEnd=e=>{
   if(!dragState||dragState.pointerId!==e.pointerId)return;
   dragState.el.releasePointerCapture(e.pointerId);
-  const ds=dragState; 
+  const ds=dragState;
   dragState=null;
 
-  if(!ds.moved){ 
-    openEdit(ds.posId, currentBoardId); 
-    return; 
+  if(!ds.moved){
+    if(ds.fromInventory){ renderInventory(currentBoardId); openInventoryEdit(ds.invId,currentBoardId); }
+    else openEdit(ds.posId,currentBoardId);
+    return;
   }
-  
-  // Center the current board index
-  snapToBoard(currentBoardIndex, true);
-  
-  // Find snap point on current board
-  let best=null, bd=Infinity;
-  const snapX = Math.max(0, Math.min(100, ds.curX));
+
+  snapToBoard(currentBoardIndex,true);
+
+  // ── DROP INTO INVENTORY ──
+  if(inventoryOpen){
+    const panel=document.getElementById('inventoryPanel');
+    const panelRect=panel.getBoundingClientRect();
+    if(e.clientY>=panelRect.top&&e.clientY<=panelRect.bottom){
+      const relX=((e.clientX-panelRect.left)/panelRect.width)*100;
+      const relY=((e.clientY-panelRect.top)/panelRect.height)*100;
+      let bestInv=null,bestInvD=Infinity;
+      inventorySlots.forEach(s=>{
+        const d=(relX-s.x)**2+(relY-s.y)**2;
+        if(d<bestInvD){bestInvD=d;bestInv=s;}
+      });
+      if(bestInv){
+        if(!allData.boards[currentBoardId].inventory) allData.boards[currentBoardId].inventory={};
+        const inv=allData.boards[currentBoardId].inventory;
+        const playerData=ds.fromInventory?inv[ds.invId]:allData.boards[currentBoardId].roster[ds.posId];
+        if(ds.fromInventory) delete inv[ds.invId];
+        else delete allData.boards[currentBoardId].roster[ds.posId];
+        // Swap if target occupied
+        if(inv[bestInv.id]){
+          if(ds.fromInventory) inv[ds.invId]=inv[bestInv.id];
+          else allData.boards[currentBoardId].roster[ds.posId]=inv[bestInv.id];
+        }
+        inv[bestInv.id]=playerData;
+        saveToCloud(); renderAllBoards(); renderInventory(currentBoardId);
+        return;
+      }
+    }
+  }
+
+  // ── DROP ON FIELD (including from inventory) ──
+  let best=null,bd=Infinity;
+  const snapX=Math.max(0,Math.min(100,ds.curX));
   positions.forEach(p=>{
-    const ddx=snapX-p.x, ddy=ds.curY-p.y, d=ddx*ddx+ddy*ddy;
-    if(d<bd){ bd=d; best=p; }
+    const ddx=snapX-p.x,ddy=ds.curY-p.y,d=ddx*ddx+ddy*ddy;
+    if(d<bd){bd=d;best=p;}
   });
 
-  if(best && bd < 500){
-    const dData = allData.boards[currentBoardId].roster[ds.posId];
-    if(allData.boards[currentBoardId].roster[best.id]) {
+  if(ds.fromInventory){
+    if(best&&bd<500){
+      if(!allData.boards[currentBoardId].inventory) allData.boards[currentBoardId].inventory={};
+      const inv=allData.boards[currentBoardId].inventory;
+      const playerData=inv[ds.invId];
+      delete inv[ds.invId];
+      // Swap with existing field player back to inventory
+      if(allData.boards[currentBoardId].roster[best.id]) inv[ds.invId]=allData.boards[currentBoardId].roster[best.id];
+      allData.boards[currentBoardId].roster[best.id]=playerData;
+      saveToCloud(); renderAllBoards(); renderInventory(currentBoardId);
+    } else {
+      // No valid snap — return to inventory
+      renderInventory(currentBoardId);
+    }
+    return;
+  }
+
+  if(best&&bd<500){
+    const dData=allData.boards[currentBoardId].roster[ds.posId];
+    if(allData.boards[currentBoardId].roster[best.id]){
       allData.boards[currentBoardId].roster[ds.posId]=allData.boards[currentBoardId].roster[best.id];
     } else {
       delete allData.boards[currentBoardId].roster[ds.posId];
     }
     allData.boards[currentBoardId].roster[best.id]=dData;
   }
-  saveToCloud(); renderAllBoards(); 
+  saveToCloud(); renderAllBoards();
 };
 
 document.onpointermove=onMove; document.onpointerup=onEnd;
+
+// Close inventory when tapping empty playing surface (pointerdown so it doesn't
+// interfere with drags — magnet pointerdown is excluded so dragging stays open)
+document.addEventListener('pointerdown',e=>{
+  if(!inventoryOpen) return;
+  if(e.target.closest('#inventoryPanel')) return;
+  if(e.target.closest('.inv-arrows')) return;
+  if(e.target.closest('.magnet')) return;
+  if(e.target.closest('.pos-slot')) return;
+  if(e.target.closest('#editOverlay')) return;
+  if(e.target.closest('#boardMenu')) return;
+  toggleInventory();
+},{passive:true});
 
 // ── EDITING ──
 function openEdit(posId,boardId){
@@ -697,17 +947,31 @@ function openEdit(posId,boardId){
 function closeEdit(){overlay.classList.remove('show'); editingPosId=null;}
 editSave.addEventListener('click',()=>{
   if(!editingPosId)return;
-  const {posId,boardId}=editingPosId;
+  const {posId,boardId,isInventory}=editingPosId;
   const name=editInput.value.trim(),badge=limitGraphemes(badgeInput.value.trim(),2);
-  const r=allData.boards[boardId].roster;
-  if(name)r[posId]={name,badge}; else delete r[posId];
-  saveToCloud(); renderBoard(boardId,boardTrack.children[getBoardIds().indexOf(boardId)]); closeEdit();
+  if(isInventory){
+    if(!allData.boards[boardId].inventory) allData.boards[boardId].inventory={};
+    if(name) allData.boards[boardId].inventory[posId]={name,badge};
+    else delete allData.boards[boardId].inventory[posId];
+    saveToCloud(); renderInventory(boardId);
+  } else {
+    const r=allData.boards[boardId].roster;
+    if(name)r[posId]={name,badge}; else delete r[posId];
+    saveToCloud(); renderBoard(boardId,boardTrack.children[getBoardIds().indexOf(boardId)]);
+  }
+  closeEdit();
 });
 editClear.addEventListener('click',()=>{
   if(!editingPosId)return;
-  const {posId,boardId}=editingPosId;
-  delete allData.boards[boardId].roster[posId];
-  saveToCloud(); renderBoard(boardId,boardTrack.children[getBoardIds().indexOf(boardId)]); closeEdit();
+  const {posId,boardId,isInventory}=editingPosId;
+  if(isInventory){
+    if(allData.boards[boardId].inventory) delete allData.boards[boardId].inventory[posId];
+    saveToCloud(); renderInventory(boardId);
+  } else {
+    delete allData.boards[boardId].roster[posId];
+    saveToCloud(); renderBoard(boardId,boardTrack.children[getBoardIds().indexOf(boardId)]);
+  }
+  closeEdit();
 });
 editCancel.addEventListener('click',closeEdit);
 editInput.addEventListener('keydown',e=>{if(e.key==='Enter')editSave.click();});
@@ -723,7 +987,7 @@ function switchBoard(id){
 function createBoard(name){
   if (isViewOnly) return;
   const id=genId();
-  allData.boards[id]={name:name.trim(),roster:{}};
+  allData.boards[id]={name:name.trim(),roster:{},inventory:{}};
   switchBoard(id);
 }
 
