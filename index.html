@@ -808,7 +808,8 @@ const onMove=e=>{
   if(dragState.moved){
     const wRect = wrapper.getBoundingClientRect();
     const W = wRect.width;
-    const edgeZone = W * 0.15;
+    const triggerZone = W * 0.16; // 16% from screen edge: triggers the slide
+    const slideTravel = W * 0.10; // 10% of screen: travel distance to complete the slide
     const ids = getBoardIds();
     
     // ── PROPORTIONAL SCROLLING ──
@@ -820,11 +821,11 @@ const onMove=e=>{
     let depth = 0;
     let direction = 0;
 
-    if (e.clientX > wRect.right - edgeZone) {
-      depth = ((e.clientX - (wRect.right - edgeZone)) / edgeZone) * 1.1; // 1.1x speed so it snaps just before physical edge
+    if (e.clientX > wRect.right - triggerZone) {
+      depth = (e.clientX - (wRect.right - triggerZone)) / slideTravel;
       direction = 1;
-    } else if (e.clientX < wRect.left + edgeZone) {
-      depth = (((wRect.left + edgeZone) - e.clientX) / edgeZone) * 1.1;
+    } else if (e.clientX < wRect.left + triggerZone) {
+      depth = ((wRect.left + triggerZone) - e.clientX) / slideTravel;
       direction = -1;
     }
 
