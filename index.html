@@ -302,6 +302,8 @@ let isNoUI = urlParams.has('noUI');
 const CLOUD_SYNC_URL=''; // Cloudflare Worker endpoint, e.g. https://aflselector-sync.yourname.workers.dev
 const CLOUD_SYNC_KEY=''; // Optional write key for the Worker. Leave blank if the Worker is public-write.
 const SAVE_DEBOUNCE_MS=1200;
+const CLOUD_FAILURE_LIMIT=5;
+const CLOUD_RETRY_MS=5000;
 
 const syncStatus=document.getElementById('syncStatus'),
       refreshBtn=document.getElementById('refreshBtn'),
@@ -361,6 +363,7 @@ let isDirty=false;
 let isSaving=false;
 let inventoryOpen=false;
 let isCloudBlocked=false;
+let cloudFailureCount=0;
 const INV_COLS=[10,30,50,70,90];
 const INV_ROWS=[13,25,37,49,61,73,85];
 const inventorySlots=[];
@@ -420,8 +423,29 @@ function blockCloud(message){
 
 function unblockCloud(){
   isCloudBlocked=false;
+  cloudFailureCount=0;
   cloudBlocker.classList.remove('show');
   updateBadge();
+}
+
+function recordCloudFailure(message,options={}){
+  const {hard=false,retrySave=false}=options;
+  if(hard){
+    blockCloud(message);
+    return true;
+  }
+  cloudFailureCount+=1;
+  if(cloudFailureCount>=CLOUD_FAILURE_LIMIT){
+    blockCloud(message);
+    return true;
+  }
+  syncStatus.textContent=`cloud issue ${cloudFailureCount}/${CLOUD_FAILURE_LIMIT}`;
+  showMessage(`CLOUD SAVE ISSUE ${cloudFailureCount}/${CLOUD_FAILURE_LIMIT}`);
+  if(retrySave){
+    clearTimeout(saveTimer);
+    saveTimer=setTimeout(()=>pushToCloud(false), CLOUD_RETRY_MS);
+  }
+  return false;
 }
 
 function showMessage(text){
@@ -514,10 +538,11 @@ async function loadFromCloud(){
     isDirty=false;
     syncStatus.textContent='synced';
   }catch(e){
+    const hard=e.status===0||e.status===401||e.status===403;
     const message=e.status===0
       ? 'Cloudflare sync is not configured yet. Coach mode is locked until a Worker URL is added.'
-      : 'Cloudflare sync could not be reached. Coach mode is locked to protect the team data.';
-    blockCloud(message);
+      : 'Cloudflare sync has failed too many times. Coach mode is locked to protect the team data.';
+    recordCloudFailure(message,{hard});
   }
   finalizeLoad();
 }
@@ -558,14 +583,16 @@ async function pushToCloud(keepalive=false){
     await writeCloudData(allData,keepalive);
     isDirty=false;
     isSaving=false;
+    cloudFailureCount=0;
     syncStatus.textContent='saved';
   }catch(e){
     isSaving=false;
-    if(e.status===401||e.status===403){
-      blockCloud('Cloudflare rejected the save request. Coach mode is locked until the Worker write key is fixed.');
-      return;
-    }
-    blockCloud('Cloudflare could not save the latest change. Coach mode is locked until cloud save is healthy again.');
+    const hard=e.status===0||e.status===401||e.status===403;
+    const message=hard
+      ? 'Cloudflare rejected the save request. Coach mode is locked until the Worker write key is fixed.'
+      : 'Cloudflare could not save after repeated attempts. Coach mode is locked until cloud save is healthy again.';
+    const locked=recordCloudFailure(message,{hard,retrySave:!hard});
+    if(!locked)syncStatus.textContent=`cloud save retry ${cloudFailureCount}/${CLOUD_FAILURE_LIMIT}`;
   }
 }
 
@@ -588,9 +615,14 @@ async function silentRefresh(){
     renderBoardMenu();
     renderBoardIndicator();
     if(inventoryOpen) renderInventory(currentBoardId);
+    cloudFailureCount=0;
     syncStatus.textContent='synced';
   }catch(e){
-    blockCloud('Cloudflare sync dropped out. Coach mode is locked until cloud save is healthy again.');
+    const hard=e.status===0||e.status===401||e.status===403;
+    const message=hard
+      ? 'Cloudflare sync is unavailable. Coach mode is locked until the Worker is fixed.'
+      : 'Cloudflare sync dropped out too many times. Coach mode is locked until cloud save is healthy again.';
+    recordCloudFailure(message,{hard});
   }
 }
 
