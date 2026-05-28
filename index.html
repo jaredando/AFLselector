@@ -308,6 +308,7 @@ const COACH_PASSWORD='Yadz';
 const COACH_AUTH_KEY='afl_coach_verified';
 const MAGNET_EDGE_ZONE_RATIO=0.08;
 const MAGNET_EDGE_HOLD_MS=850;
+const MAGNET_EDGE_SLIDE_MS=520;
 const MAGNET_EDGE_PREVIEW_RATIO=0.14;
 const BOARD_SWIPE_DISTANCE_RATIO=0.18;
 const BOARD_SWIPE_VELOCITY=0.28;
@@ -1004,6 +1005,7 @@ const onMove=e=>{
     if (inZone === 0) {
       dragState.zoneEnterTime = null;
       dragState.edgeZoneDirection = null;
+      dragState.edgeSlideStartTime = null;
       dragState.edgeLock = null; // Reset lock once user brings magnet back towards the center
     } else {
       const hasBoardInZone = inZone === 1 ? hasNext : hasPrev;
@@ -1011,17 +1013,30 @@ const onMove=e=>{
       if (!hasBoardInZone || isLockedInZone) {
         dragState.zoneEnterTime = null;
         dragState.edgeZoneDirection = null;
+        dragState.edgeSlideStartTime = null;
       } else {
         if (dragState.edgeZoneDirection !== inZone) {
           dragState.edgeZoneDirection = inZone;
           dragState.zoneEnterTime = Date.now();
+          dragState.edgeSlideStartTime = null;
         }
 
-        const holdProgress = Math.min(1, (Date.now() - dragState.zoneEnterTime) / MAGNET_EDGE_HOLD_MS);
-        proportionalOffset = inZone * -W * MAGNET_EDGE_PREVIEW_RATIO * holdProgress;
-        if (holdProgress >= 1) {
-          direction = inZone;
-          depth = 1;
+        const now = Date.now();
+        const holdProgress = Math.min(1, (now - dragState.zoneEnterTime) / MAGNET_EDGE_HOLD_MS);
+        if (holdProgress < 1) {
+          proportionalOffset = inZone * -W * MAGNET_EDGE_PREVIEW_RATIO * holdProgress;
+        } else {
+          if (!dragState.edgeSlideStartTime) dragState.edgeSlideStartTime = now;
+          const rawSlideProgress = Math.min(1, (now - dragState.edgeSlideStartTime) / MAGNET_EDGE_SLIDE_MS);
+          const easedSlideProgress = rawSlideProgress < 0.5
+            ? 2 * rawSlideProgress * rawSlideProgress
+            : 1 - Math.pow(-2 * rawSlideProgress + 2, 2) / 2;
+          const offsetRatio = MAGNET_EDGE_PREVIEW_RATIO + (1 - MAGNET_EDGE_PREVIEW_RATIO) * easedSlideProgress;
+          proportionalOffset = inZone * -W * offsetRatio;
+          if (rawSlideProgress >= 1) {
+            direction = inZone;
+            depth = 1;
+          }
         }
       }
     }
