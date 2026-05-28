@@ -638,9 +638,13 @@ document.addEventListener('visibilitychange',()=>{
 async function silentRefresh(){
   if(isDemo||isDirty||isSaving||isCloudBlocked)return;
   try{
+    const keepBoardId=currentBoardId;
     allData=await readCloudData();
     ensureDefaultBoard();
-    if(allData.boards[currentBoardId]) roster=allData.boards[currentBoardId].roster;
+    const ids=getBoardIds();
+    const nextBoardId=allData.boards[keepBoardId]?keepBoardId:ids[0];
+    setCurrentBoard(nextBoardId);
+    rebuildTrack();
     renderAllBoards();
     renderBoardMenu();
     renderBoardIndicator();

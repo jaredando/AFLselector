@@ -68,10 +68,13 @@ async function readFullData(env) {
 
   if (Array.isArray(index)) {
     const boards = {};
-    await Promise.all(index.map(async ({ id, name }) => {
+    const loadedBoards = await Promise.all(index.map(async ({ id, name }) => {
       const board = await getJsonValue(env, BOARD_KEY_PREFIX + id);
-      boards[id] = normalizeBoard(board) || { name: name || "Untitled", roster: {}, inventory: {} };
+      return [id, normalizeBoard(board) || { name: name || "Untitled", roster: {}, inventory: {} }];
     }));
+    loadedBoards.forEach(([id, board]) => {
+      boards[id] = board;
+    });
     return { boards };
   }
 
