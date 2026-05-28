@@ -304,6 +304,8 @@ const CLOUD_SYNC_KEY=''; // Optional write key for the Worker. Leave blank if th
 const SAVE_DEBOUNCE_MS=1200;
 const CLOUD_FAILURE_LIMIT=5;
 const CLOUD_RETRY_MS=5000;
+const COACH_PASSWORD='Yadz';
+const COACH_AUTH_KEY='afl_coach_verified';
 
 const syncStatus=document.getElementById('syncStatus'),
       refreshBtn=document.getElementById('refreshBtn'),
@@ -490,6 +492,10 @@ function getCloudUrl(){
 
 function hasCloudConfig(){
   return !!getCloudUrl();
+}
+
+function needsCoachPassword(){
+  return !isDemo && !isViewOnly && localStorage.getItem(COACH_AUTH_KEY) !== 'true';
 }
 
 function workerHeaders(){
@@ -1250,7 +1256,7 @@ function init() {
   updateBadge();
   if (!isDemo && !hasCloudConfig()) {
     loadFromCloud();
-  } else if (isEdit && localStorage.getItem('afl_coach_verified') !== 'true') {
+  } else if (needsCoachPassword()) {
     pwOverlay.classList.add('show');
     pwInput.focus();
   } else {
@@ -1259,14 +1265,14 @@ function init() {
 }
 
 pwSubmit.onclick = () => {
-  if (pwInput.value === 'Yadz') {
-    localStorage.setItem('afl_coach_verified', 'true');
+  if (pwInput.value === COACH_PASSWORD) {
+    localStorage.setItem(COACH_AUTH_KEY, 'true');
     pwOverlay.classList.remove('show');
     loadFromCloud();
   } else {
     showMessage("INCORRECT PASSWORD");
-    isEdit = false; isViewOnly = true;
-    pwOverlay.classList.remove('show'); updateBadge(); loadFromCloud();
+    pwInput.value='';
+    pwInput.focus();
   }
 };
 pwInput.onkeydown = e => { if(e.key === 'Enter') pwSubmit.onclick(); };
