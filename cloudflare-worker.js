@@ -34,6 +34,16 @@ function hasKvBinding(env) {
   return !!env.AFL_DATA && typeof env.AFL_DATA.get === "function" && typeof env.AFL_DATA.put === "function";
 }
 
+async function getJsonValue(env, key) {
+  const text = await env.AFL_DATA.get(key);
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    return { __invalidJson: true, key, message: e.message };
+  }
+}
+
 function normalizeBoard(data) {
   if (!data || typeof data !== "object" || typeof data.name !== "string") return null;
   return {
@@ -51,17 +61,25 @@ function makeIndex(data) {
 }
 
 async function readFullData(env) {
-  const index = await env.AFL_DATA.get(INDEX_KEY, "json");
+  const index = await getJsonValue(env, INDEX_KEY);
+  if (index && index.__invalidJson) {
+    return { error: `Invalid JSON in KV key ${INDEX_KEY}: ${index.message}`, boards: {} };
+  }
+
   if (Array.isArray(index)) {
     const boards = {};
     await Promise.all(index.map(async ({ id, name }) => {
-      const board = await env.AFL_DATA.get(BOARD_KEY_PREFIX + id, "json");
+      const board = await getJsonValue(env, BOARD_KEY_PREFIX + id);
       boards[id] = normalizeBoard(board) || { name: name || "Untitled", roster: {}, inventory: {} };
     }));
     return { boards };
   }
 
-  const saved = await env.AFL_DATA.get(DATA_KEY, "json");
+  const saved = await getJsonValue(env, DATA_KEY);
+  if (saved && saved.__invalidJson) {
+    return { error: `Invalid JSON in KV key ${DATA_KEY}: ${saved.message}`, boards: {} };
+  }
+
   return normalizeData(saved) || { boards: {} };
 }
 
@@ -83,7 +101,7 @@ async function writeFullData(env, data) {
 async function writeBoard(env, id, board) {
   const current = await readFullData(env);
   current.boards[id] = board;
-  const existingIndex = await env.AFL_DATA.get(INDEX_KEY, "json");
+  const existingIndex = await getJsonValue(env, INDEX_KEY);
   if (!Array.isArray(existingIndex)) {
     await writeFullData(env, current);
     return;
