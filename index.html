@@ -282,11 +282,15 @@ const urlParams = new URLSearchParams(window.location.search);
 let isViewOnly = urlParams.has('view'); 
 let isDemo = urlParams.has('demo');     
 let isEdit = urlParams.has('edit'); 
-let isNoUI = urlParams.has('noUI'); 
+let isNoUI = urlParams.has('noUI');
 
 const BIN_ID='69de398f856a68218931e5ea';
 const API_KEY='$2a$10$pzhEn9dwvvZP9ycmWjqIqOxQXIwhs.wWSOnj6BZv5SltQmU.XKXR6';
 const JSONBIN_URL=`https://api.jsonbin.io/v3/b/${BIN_ID}`;
+const CLOUD_SYNC_URL=''; // Optional Cloudflare Worker endpoint, e.g. https://aflselector-sync.yourname.workers.dev
+const CLOUD_SYNC_KEY=''; // Optional write key for the Worker. Leave blank if the Worker is public-write.
+const SAVE_DEBOUNCE_MS=1200;
+const SAVE_RETRY_MS=5000;
 
 const syncStatus=document.getElementById('syncStatus'),
       refreshBtn=document.getElementById('refreshBtn'),
@@ -404,6 +408,70 @@ function limitGraphemes(str,max){
 }
 
 // ── DATA SYNC ──
+function cloudError(message,status){
+  const err=new Error(message);
+  err.status=status;
+  return err;
+}
+
+function getCloudUrl(){
+  return CLOUD_SYNC_URL.replace(/\/$/,'');
+}
+
+function workerHeaders(){
+  const headers={'Content-Type':'application/json'};
+  if(CLOUD_SYNC_KEY)headers['X-AFL-Write-Key']=CLOUD_SYNC_KEY;
+  return headers;
+}
+
+function unwrapCloudData(data){
+  return data?.record||data||{boards:{}};
+}
+
+function loadCachedData(){
+  const saved=localStorage.getItem('afl_data');
+  if(!saved)return false;
+  try{
+    allData=JSON.parse(saved);
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+async function readCloudData(){
+  const workerUrl=getCloudUrl();
+  if(workerUrl){
+    const res=await fetch(`${workerUrl}?_t=${Date.now()}`,{cache:'no-store'});
+    if(!res.ok)throw cloudError('Worker read failed',res.status);
+    return unwrapCloudData(await res.json());
+  }
+  const res=await fetch(`${JSONBIN_URL}/latest?_t=${Date.now()}`,{headers:{'X-Master-Key':API_KEY},cache:'no-store'});
+  if(!res.ok)throw cloudError('JSONBin read failed',res.status);
+  return unwrapCloudData(await res.json());
+}
+
+async function writeCloudData(data,keepalive=false){
+  const workerUrl=getCloudUrl();
+  if(workerUrl){
+    const res=await fetch(workerUrl,{
+      method:'PUT',
+      headers:workerHeaders(),
+      body:JSON.stringify(data),
+      keepalive
+    });
+    if(!res.ok)throw cloudError('Worker write failed',res.status);
+    return;
+  }
+  const res=await fetch(JSONBIN_URL,{
+    method:'PUT',
+    headers:{'Content-Type':'application/json','X-Master-Key':API_KEY},
+    body:JSON.stringify(data),
+    keepalive
+  });
+  if(!res.ok)throw cloudError('JSONBin write failed',res.status);
+}
+
 async function loadFromCloud(){
   refreshBtn.textContent = '↻ REFRESHING';
   if (isDemo) {
@@ -416,18 +484,13 @@ async function loadFromCloud(){
   }
   try{
     syncStatus.textContent='syncing…';
-    const res=await fetch(`${JSONBIN_URL}/latest?_t=${Date.now()}`,{headers:{'X-Master-Key':API_KEY},cache:'no-store'});
-    if(res.ok){
-      const data=await res.json();
-      allData=data.record||{boards:{}};
-      isDirty=false;
-      localStorage.setItem('afl_data',JSON.stringify(allData));
-      syncStatus.textContent='synced';
-    }
+    allData=await readCloudData();
+    isDirty=false;
+    localStorage.setItem('afl_data',JSON.stringify(allData));
+    syncStatus.textContent='synced';
   }catch(e){
-    syncStatus.textContent='offline';
-    const saved=localStorage.getItem('afl_data');
-    if(saved) allData=JSON.parse(saved);
+    const hadCache=loadCachedData();
+    syncStatus.textContent=hadCache?'offline - local cache':(e.status===401||e.status===403?'cloud auth failed':'offline');
   }
   finalizeLoad();
 }
@@ -459,7 +522,7 @@ function saveToCloud(){
   localStorage.setItem('afl_data',JSON.stringify(allData));
   localStorage.setItem('afl_current_board',currentBoardId);
   clearTimeout(saveTimer);
-  saveTimer=setTimeout(()=>pushToCloud(false), 500);
+  saveTimer=setTimeout(()=>pushToCloud(false), SAVE_DEBOUNCE_MS);
 }
 
 async function pushToCloud(keepalive=false){
@@ -467,23 +530,18 @@ async function pushToCloud(keepalive=false){
   isSaving=true;
   syncStatus.textContent='saving…';
   try{
-    const res=await fetch(JSONBIN_URL,{
-      method:'PUT',
-      headers:{'Content-Type':'application/json','X-Master-Key':API_KEY},
-      body:JSON.stringify(allData),
-      keepalive
-    });
-    if(res.ok){
-      isDirty=false;
-      isSaving=false;
-      syncStatus.textContent='saved';
-    } else {
-      throw new Error('HTTP '+res.status);
-    }
+    await writeCloudData(allData,keepalive);
+    isDirty=false;
+    isSaving=false;
+    syncStatus.textContent='saved';
   }catch(e){
     isSaving=false;
+    if(e.status===401||e.status===403){
+      syncStatus.textContent='cloud auth failed - local only';
+      return;
+    }
     syncStatus.textContent='save failed – retrying…';
-    saveTimer=setTimeout(()=>pushToCloud(false), 5000);
+    saveTimer=setTimeout(()=>pushToCloud(false), SAVE_RETRY_MS);
   }
 }
 
@@ -499,19 +557,15 @@ document.addEventListener('visibilitychange',()=>{
 async function silentRefresh(){
   if(isDemo||isDirty||isSaving)return;
   try{
-    const res=await fetch(`${JSONBIN_URL}/latest?_t=${Date.now()}`,{headers:{'X-Master-Key':API_KEY},cache:'no-store'});
-    if(res.ok){
-      const data=await res.json();
-      allData=data.record||{boards:{}};
-      localStorage.setItem('afl_data',JSON.stringify(allData));
-      ensureDefaultBoard();
-      if(allData.boards[currentBoardId]) roster=allData.boards[currentBoardId].roster;
-      renderAllBoards();
-      renderBoardMenu();
-      renderBoardIndicator();
-      if(inventoryOpen) renderInventory(currentBoardId);
-      syncStatus.textContent='synced';
-    }
+    allData=await readCloudData();
+    localStorage.setItem('afl_data',JSON.stringify(allData));
+    ensureDefaultBoard();
+    if(allData.boards[currentBoardId]) roster=allData.boards[currentBoardId].roster;
+    renderAllBoards();
+    renderBoardMenu();
+    renderBoardIndicator();
+    if(inventoryOpen) renderInventory(currentBoardId);
+    syncStatus.textContent='synced';
   }catch(e){}
 }
 
@@ -828,12 +882,22 @@ const onMove=e=>{
     let depth = 0;
     let direction = 0;
 
-    if (e.clientX > wRect.right - triggerZone) {
-      depth = (e.clientX - (wRect.right - triggerZone)) / slideTravel;
-      direction = 1;
-    } else if (e.clientX < wRect.left + triggerZone) {
-      depth = ((wRect.left + triggerZone) - e.clientX) / slideTravel;
-      direction = -1;
+    let inZone = 0;
+    if (e.clientX > wRect.right - triggerZone) inZone = 1;
+    else if (e.clientX < wRect.left + triggerZone) inZone = -1;
+
+    if (inZone === 0) {
+      dragState.zoneEnterTime = null;
+      dragState.edgeLock = null; // Reset lock once user brings magnet back towards the center
+    } else {
+      if (!dragState.zoneEnterTime) dragState.zoneEnterTime = Date.now();
+
+      // Require holding in the trigger zone for 500ms before engaging the slide
+      if (Date.now() - dragState.zoneEnterTime >= 500) {
+        direction = inZone;
+        if (inZone === 1) depth = (e.clientX - (wRect.right - triggerZone)) / slideTravel;
+        else depth = ((wRect.left + triggerZone) - e.clientX) / slideTravel;
+      }
     }
 
     // Reset lock once user brings magnet back towards the center
@@ -859,7 +923,7 @@ const onMove=e=>{
     // If we transition to a new board, instantly reset offset so index natively handles it
     if (transferTriggered !== false) {
       logicalTransfer(transferTriggered);
-      proportionalOffset = 0; 
+      proportionalOffset = 0;
     }
 
     // Apply Track Position
