@@ -30,6 +30,10 @@ function normalizeData(data) {
   return candidate;
 }
 
+function hasKvBinding(env) {
+  return !!env.AFL_DATA && typeof env.AFL_DATA.get === "function" && typeof env.AFL_DATA.put === "function";
+}
+
 function normalizeBoard(data) {
   if (!data || typeof data !== "object" || typeof data.name !== "string") return null;
   return {
@@ -98,8 +102,10 @@ export default {
       return new Response(null, { headers: corsHeaders(env) });
     }
 
-    if (!env.AFL_DATA) {
-      return jsonResponse({ error: "Missing AFL_DATA KV binding" }, env, 500);
+    if (!hasKvBinding(env)) {
+      return jsonResponse({
+        error: "AFL_DATA must be a KV namespace binding, not a text variable or secret"
+      }, env, 500);
     }
 
     if (request.method === "GET") {
