@@ -80,6 +80,10 @@ async function writeBoard(env, id, board) {
   const current = await readFullData(env);
   current.boards[id] = board;
   const existingIndex = await env.AFL_DATA.get(INDEX_KEY, "json");
+  if (!Array.isArray(existingIndex)) {
+    await writeFullData(env, current);
+    return;
+  }
   const index = makeIndex(current);
   const existingEntry = Array.isArray(existingIndex) && existingIndex.find(entry => entry.id === id);
   const indexChanged = !existingEntry || existingEntry.name !== board.name || existingIndex.length !== index.length;
