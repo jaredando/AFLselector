@@ -364,6 +364,7 @@ let isSaving=false;
 let inventoryOpen=false;
 let isCloudBlocked=false;
 let cloudFailureCount=0;
+let pendingCloudBoardIds=new Set();
 const INV_COLS=[10,30,50,70,90];
 const INV_ROWS=[13,25,37,49,61,73,85];
 const inventorySlots=[];
@@ -509,9 +510,24 @@ async function readCloudData(){
   return unwrapCloudData(await res.json());
 }
 
-async function writeCloudData(data,keepalive=false){
+async function writeCloudData(data,keepalive=false,boardIds=null){
   const workerUrl=getCloudUrl();
   if(!workerUrl)throw cloudError('Cloudflare sync URL is not configured',0);
+  const ids=boardIds&&boardIds.length?boardIds:null;
+  if(ids){
+    for(const id of ids){
+      const board=data.boards[id];
+      if(!board)continue;
+      const res=await fetch(`${workerUrl}?board=${encodeURIComponent(id)}`,{
+        method:'PUT',
+        headers:workerHeaders(),
+        body:JSON.stringify({board}),
+        keepalive
+      });
+      if(!res.ok)throw cloudError('Cloudflare board write failed',res.status);
+    }
+    return;
+  }
   const res=await fetch(workerUrl,{
     method:'PUT',
     headers:workerHeaders(),
@@ -561,7 +577,12 @@ function finalizeLoad() {
   startAutoRefresh();
 }
 
-function saveToCloud(){
+function markCloudBoards(boardIds){
+  const ids=Array.isArray(boardIds)?boardIds:[boardIds||currentBoardId];
+  ids.forEach(id=>{if(id)pendingCloudBoardIds.add(id);});
+}
+
+function saveToCloud(boardIds=null){
   if (isViewOnly||isCloudBlocked) return;
   allData.boards[currentBoardId].roster=roster;
   if (isDemo) {
@@ -570,6 +591,7 @@ function saveToCloud(){
     syncStatus.textContent = 'saved locally';
     return;
   }
+  markCloudBoards(boardIds);
   isDirty=true;
   clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>pushToCloud(false), SAVE_DEBOUNCE_MS);
@@ -579,8 +601,10 @@ async function pushToCloud(keepalive=false){
   saveTimer=null;
   isSaving=true;
   syncStatus.textContent='saving…';
+  const boardIds=[...pendingCloudBoardIds].filter(id=>allData.boards[id]);
   try{
-    await writeCloudData(allData,keepalive);
+    await writeCloudData(allData,keepalive,boardIds);
+    boardIds.forEach(id=>pendingCloudBoardIds.delete(id));
     isDirty=false;
     isSaving=false;
     cloudFailureCount=0;
@@ -917,7 +941,7 @@ function logicalTransfer(direction) {
     // Update UI elements
     activeBoardNameEl.textContent = allData.boards[nextId].name;
     renderBoardIndicator();
-    saveToCloud();
+    saveToCloud([prevId,nextId]);
   }
 }
 
@@ -1168,8 +1192,8 @@ function createBoard(name){
   allData.boards[id]={name:name.trim(),roster:{},inventory:{}};
   rebuildTrack();
   renderAllBoards();
-  saveToCloud();
   switchBoard(id);
+  saveToCloud(id);
 }
 
 // ── SWIPE GESTURE ──
