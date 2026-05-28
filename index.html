@@ -306,6 +306,12 @@ const CLOUD_FAILURE_LIMIT=5;
 const CLOUD_RETRY_MS=5000;
 const COACH_PASSWORD='Yadz';
 const COACH_AUTH_KEY='afl_coach_verified';
+const MAGNET_EDGE_ZONE_RATIO=0.08;
+const MAGNET_EDGE_HOLD_MS=850;
+const MAGNET_EDGE_PREVIEW_RATIO=0.14;
+const BOARD_SWIPE_DISTANCE_RATIO=0.18;
+const BOARD_SWIPE_VELOCITY=0.28;
+const BOARD_SWIPE_VERTICAL_SLOP=42;
 
 const syncStatus=document.getElementById('syncStatus'),
       refreshBtn=document.getElementById('refreshBtn'),
@@ -979,8 +985,7 @@ const onMove=e=>{
   if(dragState.moved){
     const wRect = wrapper.getBoundingClientRect();
     const W = wRect.width;
-    const triggerZone = W * 0.16; // 16% from screen edge: triggers the slide
-    const slideTravel = W * 0.10; // 10% of screen: travel distance to complete the slide
+    const triggerZone = W * MAGNET_EDGE_ZONE_RATIO;
     const ids = getBoardIds();
     
     // ── PROPORTIONAL SCROLLING ──
@@ -998,36 +1003,46 @@ const onMove=e=>{
 
     if (inZone === 0) {
       dragState.zoneEnterTime = null;
+      dragState.edgeZoneDirection = null;
       dragState.edgeLock = null; // Reset lock once user brings magnet back towards the center
     } else {
-      if (!dragState.zoneEnterTime) dragState.zoneEnterTime = Date.now();
+      const hasBoardInZone = inZone === 1 ? hasNext : hasPrev;
+      const isLockedInZone = (inZone === 1 && dragState.edgeLock === 'right') || (inZone === -1 && dragState.edgeLock === 'left');
+      if (!hasBoardInZone || isLockedInZone) {
+        dragState.zoneEnterTime = null;
+        dragState.edgeZoneDirection = null;
+      } else {
+        if (dragState.edgeZoneDirection !== inZone) {
+          dragState.edgeZoneDirection = inZone;
+          dragState.zoneEnterTime = Date.now();
+        }
 
-      // Require holding in the trigger zone for 500ms before engaging the slide
-      if (Date.now() - dragState.zoneEnterTime >= 500) {
-        direction = inZone;
-        if (inZone === 1) depth = (e.clientX - (wRect.right - triggerZone)) / slideTravel;
-        else depth = ((wRect.left + triggerZone) - e.clientX) / slideTravel;
+        const holdProgress = Math.min(1, (Date.now() - dragState.zoneEnterTime) / MAGNET_EDGE_HOLD_MS);
+        proportionalOffset = inZone * -W * MAGNET_EDGE_PREVIEW_RATIO * holdProgress;
+        if (holdProgress >= 1) {
+          direction = inZone;
+          depth = 1;
+        }
       }
     }
-
-    // Reset lock once user brings magnet back towards the center
-    if (depth <= 0) dragState.edgeLock = null;
 
     // Apply scroll if a board exists in that direction, and we aren't locked
     if (direction === 1 && hasNext && dragState.edgeLock !== 'right') {
       const cappedDepth = Math.min(1.0, Math.max(0, depth));
-      proportionalOffset = -cappedDepth * W;
+      proportionalOffset = -Math.max(MAGNET_EDGE_PREVIEW_RATIO, cappedDepth) * W;
       if (cappedDepth >= 1.0) {
         transferTriggered = 1;
         dragState.edgeLock = 'right'; // lock this edge so we stop scrolling
       }
     } else if (direction === -1 && hasPrev && dragState.edgeLock !== 'left') {
       const cappedDepth = Math.min(1.0, Math.max(0, depth));
-      proportionalOffset = cappedDepth * W;
+      proportionalOffset = Math.max(MAGNET_EDGE_PREVIEW_RATIO, cappedDepth) * W;
       if (cappedDepth >= 1.0) {
         transferTriggered = -1;
         dragState.edgeLock = 'left';
       }
+    } else if ((direction === 1 && !hasNext) || (direction === -1 && !hasPrev)) {
+      proportionalOffset = 0;
     }
 
     // If we transition to a new board, instantly reset offset so index natively handles it
@@ -1225,14 +1240,25 @@ let trackSwipeState=null;
 wrapper.addEventListener('pointerdown',e=>{
   if(isCloudBlocked)return;
   if(dragState||e.target.closest('.magnet')||e.target.closest('.pos-slot')) return;
-  trackSwipeState={startX:e.clientX,lastX:e.clientX,pointerId:e.pointerId,baseX:-currentBoardIndex*wrapper.clientWidth,startTime:Date.now()};
+  trackSwipeState={startX:e.clientX,startY:e.clientY,lastX:e.clientX,pointerId:e.pointerId,baseX:-currentBoardIndex*wrapper.clientWidth,startTime:Date.now(),active:false,canceled:false};
   boardTrack.style.transition='none';
 },{passive:true});
 
 wrapper.addEventListener('pointermove',e=>{
   if(isCloudBlocked)return;
   if(!trackSwipeState||trackSwipeState.pointerId!==e.pointerId)return;
+  if(trackSwipeState.canceled)return;
   const dx=e.clientX-trackSwipeState.startX;
+  const dy=e.clientY-trackSwipeState.startY;
+  if(!trackSwipeState.active){
+    if(Math.abs(dx)<8&&Math.abs(dy)<8)return;
+    if(Math.abs(dy)>BOARD_SWIPE_VERTICAL_SLOP&&Math.abs(dy)>Math.abs(dx)*1.15){
+      trackSwipeState.canceled=true;
+      setTrackX(currentBoardIndex,true);
+      return;
+    }
+    trackSwipeState.active=true;
+  }
   const ids=getBoardIds();
   const w=wrapper.clientWidth;
   let x=trackSwipeState.baseX+dx;
@@ -1246,12 +1272,16 @@ wrapper.addEventListener('pointerup',e=>{
   if(isCloudBlocked)return;
   if(!trackSwipeState||trackSwipeState.pointerId!==e.pointerId)return;
   const sw=trackSwipeState; trackSwipeState=null;
+  if(sw.canceled||!sw.active){
+    snapToBoard(currentBoardIndex,true);
+    return;
+  }
   const dx=e.clientX-sw.startX;
   const dt=Date.now()-sw.startTime;
   const velocity=dx/dt; 
   const w=wrapper.clientWidth;
   let targetIndex=currentBoardIndex;
-  if(Math.abs(dx)>w*0.3||Math.abs(velocity)>0.4){
+  if(Math.abs(dx)>w*BOARD_SWIPE_DISTANCE_RATIO||Math.abs(velocity)>BOARD_SWIPE_VELOCITY){
     if(dx<0) targetIndex++;
     else targetIndex--;
   }
