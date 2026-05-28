@@ -20,6 +20,14 @@ function jsonResponse(body, env, status = 200) {
   });
 }
 
+function normalizeData(data) {
+  const candidate = data && typeof data === "object" && data.record ? data.record : data;
+  if (!candidate || typeof candidate !== "object" || !candidate.boards || typeof candidate.boards !== "object") {
+    return null;
+  }
+  return candidate;
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") {
@@ -55,11 +63,12 @@ export default {
         return jsonResponse({ error: "Invalid JSON" }, env, 400);
       }
 
-      if (!data || typeof data !== "object" || !data.boards || typeof data.boards !== "object") {
-        return jsonResponse({ error: "Expected { boards: ... }" }, env, 400);
+      const normalized = normalizeData(data);
+      if (!normalized) {
+        return jsonResponse({ error: "Expected { boards: ... } or { record: { boards: ... } }" }, env, 400);
       }
 
-      await env.AFL_DATA.put(DATA_KEY, JSON.stringify(data));
+      await env.AFL_DATA.put(DATA_KEY, JSON.stringify(normalized));
       return jsonResponse({ ok: true }, env);
     }
 

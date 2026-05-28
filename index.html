@@ -131,6 +131,13 @@
   #boardIndicator{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);z-index:100;display:flex;gap:7px;align-items:center;}
   .board-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.2);transition:background 0.2s,transform 0.2s;}
   .board-dot.active{background:rgba(255,255,255,0.75);transform:scale(1.4);}
+  #cloudBlocker{display:none;position:absolute;inset:0;z-index:250;background:rgba(2,8,23,0.78);backdrop-filter:blur(5px);align-items:center;justify-content:center;padding:24px;text-align:center;}
+  #cloudBlocker.show{display:flex;}
+  #cloudBlocker .cloud-box{width:min(340px,100%);background:rgba(7,23,55,0.92);border:1px solid rgba(255,255,255,0.14);border-radius:8px;padding:22px 20px 20px;box-shadow:0 20px 50px rgba(0,0,0,0.35);}
+  #cloudBlocker .cloud-title{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:2px;color:#f87171;margin-bottom:8px;}
+  #cloudBlocker .cloud-copy{font-size:15px;line-height:1.35;color:rgba(255,255,255,0.76);}
+  #cloudBlocker .cloud-small{margin-top:12px;font-size:11px;line-height:1.3;color:rgba(255,255,255,0.42);}
+  #cloudRetryBtn{margin-top:18px;height:38px;border:0;border-radius:6px;background:#3b82f6;color:white;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;padding:0 18px;cursor:pointer;}
 
   /* ── Board menu ── */
   #boardMenuOverlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.5);}
@@ -235,6 +242,14 @@
 
   <!-- Global Message Overlay -->
   <div id="toastOverlay"></div>
+  <div id="cloudBlocker">
+    <div class="cloud-box">
+      <div class="cloud-title">CLOUD SAVE UNAVAILABLE</div>
+      <div class="cloud-copy" id="cloudBlockerMessage">Coach mode is locked until Cloudflare sync is connected.</div>
+      <div class="cloud-small">Demo mode is the only local-save mode. Add <strong>?demo</strong> to the URL if you need a local sandbox.</div>
+      <button id="cloudRetryBtn">RETRY CLOUD</button>
+    </div>
+  </div>
   <!-- Inventory panel -->
   <div id="inventoryPanel"><div id="inventoryLabel">EXTRA BENCH</div></div>
 </div>
@@ -279,18 +294,14 @@
 <script>
 // ── GLOBALS & STATE ──
 const urlParams = new URLSearchParams(window.location.search);
-let isViewOnly = urlParams.has('view'); 
-let isDemo = urlParams.has('demo');     
-let isEdit = urlParams.has('edit'); 
+let isViewOnly = urlParams.has('view');
+let isDemo = urlParams.has('demo');
+let isEdit = urlParams.has('edit');
 let isNoUI = urlParams.has('noUI');
 
-const BIN_ID='69de398f856a68218931e5ea';
-const API_KEY='$2a$10$pzhEn9dwvvZP9ycmWjqIqOxQXIwhs.wWSOnj6BZv5SltQmU.XKXR6';
-const JSONBIN_URL=`https://api.jsonbin.io/v3/b/${BIN_ID}`;
-const CLOUD_SYNC_URL=''; // Optional Cloudflare Worker endpoint, e.g. https://aflselector-sync.yourname.workers.dev
+const CLOUD_SYNC_URL=''; // Cloudflare Worker endpoint, e.g. https://aflselector-sync.yourname.workers.dev
 const CLOUD_SYNC_KEY=''; // Optional write key for the Worker. Leave blank if the Worker is public-write.
 const SAVE_DEBOUNCE_MS=1200;
-const SAVE_RETRY_MS=5000;
 
 const syncStatus=document.getElementById('syncStatus'),
       refreshBtn=document.getElementById('refreshBtn'),
@@ -318,7 +329,10 @@ const syncStatus=document.getElementById('syncStatus'),
       modeBadge=document.getElementById('modeBadge'),
       pwOverlay=document.getElementById('pwOverlay'),
       pwInput=document.getElementById('pwInput'),
-      pwSubmit=document.getElementById('pwSubmit');
+      pwSubmit=document.getElementById('pwSubmit'),
+      cloudBlocker=document.getElementById('cloudBlocker'),
+      cloudBlockerMessage=document.getElementById('cloudBlockerMessage'),
+      cloudRetryBtn=document.getElementById('cloudRetryBtn');
 
 const positions=[
   {id:'fpl',x:22,y:6,label:'FP'},{id:'ff',x:50,y:4,label:'FF'},{id:'fpr',x:78,y:6,label:'FP'},
@@ -346,6 +360,7 @@ let autoRefreshInterval=null;
 let isDirty=false;
 let isSaving=false;
 let inventoryOpen=false;
+let isCloudBlocked=false;
 const INV_COLS=[10,30,50,70,90];
 const INV_ROWS=[13,25,37,49,61,73,85];
 const inventorySlots=[];
@@ -374,9 +389,39 @@ function setCurrentBoard(id){
 
 function updateBadge() {
   if (!modeBadge) return;
-  if (isViewOnly) modeBadge.textContent = 'View Only';
+  if (isCloudBlocked) modeBadge.textContent = 'Cloud Save Broken';
+  else if (isViewOnly) modeBadge.textContent = 'View Only';
   else if (isDemo) modeBadge.textContent = 'Demo Mode (Local Save)';
   else modeBadge.textContent = 'Coach Mode';
+}
+
+function blockCloud(message){
+  isCloudBlocked=true;
+  clearTimeout(saveTimer);
+  clearInterval(autoRefreshInterval);
+  saveTimer=null;
+  isSaving=false;
+  isDirty=false;
+  dragState=null;
+  if(inventoryOpen){
+    inventoryOpen=false;
+    document.getElementById('inventoryPanel').classList.remove('open');
+    wrapper.style.transform='translateY(5%)';
+    wrapper.style.clipPath='inset(0 0 0 0)';
+    document.querySelectorAll('.inv-arrows').forEach(el=>el.classList.remove('open'));
+  }
+  closeEdit();
+  closeBoardMenu();
+  cloudBlockerMessage.textContent=message||'Coach mode is locked until Cloudflare sync is connected.';
+  cloudBlocker.classList.add('show');
+  syncStatus.textContent='cloud save unavailable';
+  updateBadge();
+}
+
+function unblockCloud(){
+  isCloudBlocked=false;
+  cloudBlocker.classList.remove('show');
+  updateBadge();
 }
 
 function showMessage(text){
@@ -418,6 +463,10 @@ function getCloudUrl(){
   return CLOUD_SYNC_URL.replace(/\/$/,'');
 }
 
+function hasCloudConfig(){
+  return !!getCloudUrl();
+}
+
 function workerHeaders(){
   const headers={'Content-Type':'application/json'};
   if(CLOUD_SYNC_KEY)headers['X-AFL-Write-Key']=CLOUD_SYNC_KEY;
@@ -428,48 +477,24 @@ function unwrapCloudData(data){
   return data?.record||data||{boards:{}};
 }
 
-function loadCachedData(){
-  const saved=localStorage.getItem('afl_data');
-  if(!saved)return false;
-  try{
-    allData=JSON.parse(saved);
-    return true;
-  }catch(e){
-    return false;
-  }
-}
-
 async function readCloudData(){
   const workerUrl=getCloudUrl();
-  if(workerUrl){
-    const res=await fetch(`${workerUrl}?_t=${Date.now()}`,{cache:'no-store'});
-    if(!res.ok)throw cloudError('Worker read failed',res.status);
-    return unwrapCloudData(await res.json());
-  }
-  const res=await fetch(`${JSONBIN_URL}/latest?_t=${Date.now()}`,{headers:{'X-Master-Key':API_KEY},cache:'no-store'});
-  if(!res.ok)throw cloudError('JSONBin read failed',res.status);
+  if(!workerUrl)throw cloudError('Cloudflare sync URL is not configured',0);
+  const res=await fetch(`${workerUrl}?_t=${Date.now()}`,{cache:'no-store'});
+  if(!res.ok)throw cloudError('Cloudflare read failed',res.status);
   return unwrapCloudData(await res.json());
 }
 
 async function writeCloudData(data,keepalive=false){
   const workerUrl=getCloudUrl();
-  if(workerUrl){
-    const res=await fetch(workerUrl,{
-      method:'PUT',
-      headers:workerHeaders(),
-      body:JSON.stringify(data),
-      keepalive
-    });
-    if(!res.ok)throw cloudError('Worker write failed',res.status);
-    return;
-  }
-  const res=await fetch(JSONBIN_URL,{
+  if(!workerUrl)throw cloudError('Cloudflare sync URL is not configured',0);
+  const res=await fetch(workerUrl,{
     method:'PUT',
-    headers:{'Content-Type':'application/json','X-Master-Key':API_KEY},
+    headers:workerHeaders(),
     body:JSON.stringify(data),
     keepalive
   });
-  if(!res.ok)throw cloudError('JSONBin write failed',res.status);
+  if(!res.ok)throw cloudError('Cloudflare write failed',res.status);
 }
 
 async function loadFromCloud(){
@@ -479,18 +504,20 @@ async function loadFromCloud(){
     if (saved) allData = JSON.parse(saved);
     else ensureDefaultBoard();
     finalizeLoad();
-    syncStatus.textContent = 'local mode';
+    syncStatus.textContent = 'demo local mode';
     return;
   }
   try{
     syncStatus.textContent='syncing…';
     allData=await readCloudData();
+    unblockCloud();
     isDirty=false;
-    localStorage.setItem('afl_data',JSON.stringify(allData));
     syncStatus.textContent='synced';
   }catch(e){
-    const hadCache=loadCachedData();
-    syncStatus.textContent=hadCache?'offline - local cache':(e.status===401||e.status===403?'cloud auth failed':'offline');
+    const message=e.status===0
+      ? 'Cloudflare sync is not configured yet. Coach mode is locked until a Worker URL is added.'
+      : 'Cloudflare sync could not be reached. Coach mode is locked to protect the team data.';
+    blockCloud(message);
   }
   finalizeLoad();
 }
@@ -498,7 +525,7 @@ async function loadFromCloud(){
 function finalizeLoad() {
   ensureDefaultBoard();
   const ids = getBoardIds();
-  const savedCurrent = localStorage.getItem(isDemo ? 'afl_demo_current' : 'afl_current_board');
+  const savedCurrent = isDemo ? localStorage.getItem('afl_demo_current') : null;
   const startId = (savedCurrent && allData.boards[savedCurrent]) ? savedCurrent : ids[0];
   setCurrentBoard(startId);
   rebuildTrack();
@@ -510,7 +537,7 @@ function finalizeLoad() {
 }
 
 function saveToCloud(){
-  if (isViewOnly) return;
+  if (isViewOnly||isCloudBlocked) return;
   allData.boards[currentBoardId].roster=roster;
   if (isDemo) {
     localStorage.setItem('afl_demo_data', JSON.stringify(allData));
@@ -519,8 +546,6 @@ function saveToCloud(){
     return;
   }
   isDirty=true;
-  localStorage.setItem('afl_data',JSON.stringify(allData));
-  localStorage.setItem('afl_current_board',currentBoardId);
   clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>pushToCloud(false), SAVE_DEBOUNCE_MS);
 }
@@ -537,11 +562,10 @@ async function pushToCloud(keepalive=false){
   }catch(e){
     isSaving=false;
     if(e.status===401||e.status===403){
-      syncStatus.textContent='cloud auth failed - local only';
+      blockCloud('Cloudflare rejected the save request. Coach mode is locked until the Worker write key is fixed.');
       return;
     }
-    syncStatus.textContent='save failed – retrying…';
-    saveTimer=setTimeout(()=>pushToCloud(false), SAVE_RETRY_MS);
+    blockCloud('Cloudflare could not save the latest change. Coach mode is locked until cloud save is healthy again.');
   }
 }
 
@@ -555,10 +579,9 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 async function silentRefresh(){
-  if(isDemo||isDirty||isSaving)return;
+  if(isDemo||isDirty||isSaving||isCloudBlocked)return;
   try{
     allData=await readCloudData();
-    localStorage.setItem('afl_data',JSON.stringify(allData));
     ensureDefaultBoard();
     if(allData.boards[currentBoardId]) roster=allData.boards[currentBoardId].roster;
     renderAllBoards();
@@ -566,12 +589,14 @@ async function silentRefresh(){
     renderBoardIndicator();
     if(inventoryOpen) renderInventory(currentBoardId);
     syncStatus.textContent='synced';
-  }catch(e){}
+  }catch(e){
+    blockCloud('Cloudflare sync dropped out. Coach mode is locked until cloud save is healthy again.');
+  }
 }
 
 function startAutoRefresh(){
   clearInterval(autoRefreshInterval);
-  if(isDemo)return;
+  if(isDemo||isCloudBlocked)return;
   autoRefreshInterval=setInterval(()=>{
     if(!dragState&&!isDirty&&!isSaving) silentRefresh();
   },15000);
@@ -579,6 +604,7 @@ function startAutoRefresh(){
 
 // ── INVENTORY ──
 function toggleInventory(){
+  if(isCloudBlocked)return;
   inventoryOpen=!inventoryOpen;
   document.getElementById('inventoryPanel').classList.toggle('open',inventoryOpen);
   wrapper.style.transform=inventoryOpen?'translateY(calc(5% - 30dvh))':'translateY(5%)';
@@ -603,7 +629,7 @@ function renderInventory(boardId){
     slot.style.left=s.x+'%';slot.style.top=s.y+'%';
     if(!name){
       slot.innerHTML=`<span class="pos-label">---</span>`;
-      if(!isViewOnly) slot.onclick=()=>openInventoryEdit(s.id,boardId);
+      if(!isViewOnly&&!isCloudBlocked) slot.onclick=()=>openInventoryEdit(s.id,boardId);
     }
     panel.appendChild(slot);
     if(name){
@@ -612,7 +638,7 @@ function renderInventory(boardId){
       mag.style.left=s.x+'%';mag.style.top=s.y+'%';
       const badgeFontSize=(graphemeCount(badge||'')===1)?'15px':'11px';
       mag.innerHTML=`<div class="mag-badge" style="font-size:${badgeFontSize}">${badge||''}</div><div class="mag-name">${name}</div>`;
-      if(!isViewOnly){
+      if(!isViewOnly&&!isCloudBlocked){
         mag.addEventListener('pointerdown',ev=>{
           if(!ev.isPrimary||ev.button!==0)return;
           ev.preventDefault();
@@ -642,6 +668,7 @@ function renderInventory(boardId){
 }
 
 function openInventoryEdit(slotId,boardId){
+  if(isCloudBlocked)return;
   editingPosId={posId:slotId,boardId,isInventory:true};
   const data=allData.boards[boardId]?.inventory?.[slotId];
   editTitle.textContent='BENCH';
@@ -653,7 +680,7 @@ function openInventoryEdit(slotId,boardId){
 // ── UI RENDERING ──
 function renderBoardMenu(){
   boardListEl.innerHTML='';
-  if (isViewOnly) createBoardBtn.style.display = 'none';
+  createBoardBtn.style.display = (isViewOnly||isCloudBlocked) ? 'none' : 'flex';
   Object.entries(allData.boards).forEach(([id,board])=>{
     const item=document.createElement('div');
     item.className='board-item'+(id===currentBoardId?' active':'');
@@ -666,7 +693,7 @@ function renderBoardMenu(){
 function renderBoardIndicator(){
   const el=document.getElementById('boardIndicator');
   const ids=getBoardIds();
-  el.style.display=(ids.length>1 && !inventoryOpen)?'flex':'none';
+  el.style.display=(ids.length>1 && !inventoryOpen && !isCloudBlocked)?'flex':'none';
   el.innerHTML='';
   ids.forEach(id=>{
     const dot=document.createElement('div');
@@ -676,6 +703,7 @@ function renderBoardIndicator(){
 }
 
 function openBoardMenu(){
+  if(isCloudBlocked)return;
   boardMenuOverlay.classList.add('open');
   boardMenuEl.classList.add('open');
 }
@@ -744,7 +772,7 @@ function renderBoard(boardId,groundEl){
     slot.style.left=p.x+'%';slot.style.top=p.y+'%';
     if(!name){
       slot.innerHTML=`<span class="pos-label">${p.label}</span>`;
-      if (!isViewOnly) slot.onclick=()=>{if(!suppressClick)openEdit(p.id,boardId);};
+      if (!isViewOnly&&!isCloudBlocked) slot.onclick=()=>{if(!suppressClick)openEdit(p.id,boardId);};
     }
     groundEl.appendChild(slot);
     if(name){
@@ -759,7 +787,7 @@ function renderBoard(boardId,groundEl){
       mag.innerHTML=`<div class="mag-badge" style="font-size:${badgeFontSize};color:${badgeColor}">${displayBadge}</div><div class="mag-name">${name}</div>`;
       mag.dataset.posId=p.id;
       mag.dataset.boardId=boardId;
-      if (!isViewOnly) {
+      if (!isViewOnly&&!isCloudBlocked) {
         mag.addEventListener('pointerdown',e=>{
           if(boardId!==currentBoardId)return;
           if(!e.isPrimary||e.button!==0)return;
@@ -788,7 +816,7 @@ function renderBoard(boardId,groundEl){
   arrows.className='inv-arrows'+(inventoryOpen?' open':'');
   arrows.innerHTML='<span></span><span></span><span></span><span></span><span></span><span></span>';
   arrows.addEventListener('pointerdown',e=>{e.stopPropagation();e.preventDefault();});
-  arrows.addEventListener('click',e=>{e.stopPropagation();if(boardId===currentBoardId)toggleInventory();});
+  arrows.addEventListener('click',e=>{e.stopPropagation();if(boardId===currentBoardId&&!isCloudBlocked)toggleInventory();});
   groundEl.appendChild(arrows);
 }
 
@@ -813,12 +841,13 @@ function snapToBoard(index, animate = true){
   setCurrentBoard(ids[index]);
   renderBoardMenu();
   renderBoardIndicator();
-  localStorage.setItem(isDemo ? 'afl_demo_current' : 'afl_current_board', currentBoardId);
+  if(isDemo)localStorage.setItem('afl_demo_current', currentBoardId);
   if(inventoryOpen) renderInventory(currentBoardId);
 }
 
 // ── CARRY TRANSITION LOGIC ──
 function logicalTransfer(direction) {
+  if (isCloudBlocked) return;
   if (!dragState) return;
   const ds = dragState;
   const ids = getBoardIds();
@@ -861,6 +890,7 @@ function logicalTransfer(direction) {
 }
 
 const onMove=e=>{
+  if(isCloudBlocked)return;
   if(!dragState||dragState.pointerId!==e.pointerId)return;
   
   const dx=e.clientX-dragState.startX,dy=e.clientY-dragState.startY;
@@ -944,6 +974,7 @@ const onMove=e=>{
 };
 
 const onEnd=e=>{
+  if(isCloudBlocked)return;
   if(!dragState||dragState.pointerId!==e.pointerId)return;
   dragState.el.releasePointerCapture(e.pointerId);
   const ds=dragState;
@@ -1043,7 +1074,7 @@ document.addEventListener('pointerdown',e=>{
 
 // ── EDITING ──
 function openEdit(posId,boardId){
-  if (isViewOnly) return;
+  if (isViewOnly||isCloudBlocked) return;
   editingPosId={posId,boardId};
   const data=allData.boards[boardId]?.roster[posId];
   const posLabel = positions.find(x=>x.id===posId).label;
@@ -1090,6 +1121,7 @@ editCancel.addEventListener('click', e => {
 });
 editInput.addEventListener('keydown',e=>{if(e.key==='Enter')editSave.click();});
 refreshBtn.addEventListener('click',loadFromCloud);
+cloudRetryBtn.addEventListener('click',loadFromCloud);
 window.addEventListener('resize',()=>{rebuildTrack(); renderAllBoards();});
 
 function switchBoard(id){
@@ -1099,7 +1131,7 @@ function switchBoard(id){
 }
 
 function createBoard(name){
-  if (isViewOnly) return;
+  if (isViewOnly||isCloudBlocked) return;
   const id=genId();
   allData.boards[id]={name:name.trim(),roster:{},inventory:{}};
   rebuildTrack();
@@ -1111,12 +1143,14 @@ function createBoard(name){
 // ── SWIPE GESTURE ──
 let trackSwipeState=null;
 wrapper.addEventListener('pointerdown',e=>{
+  if(isCloudBlocked)return;
   if(dragState||e.target.closest('.magnet')||e.target.closest('.pos-slot')) return;
   trackSwipeState={startX:e.clientX,lastX:e.clientX,pointerId:e.pointerId,baseX:-currentBoardIndex*wrapper.clientWidth,startTime:Date.now()};
   boardTrack.style.transition='none';
 },{passive:true});
 
 wrapper.addEventListener('pointermove',e=>{
+  if(isCloudBlocked)return;
   if(!trackSwipeState||trackSwipeState.pointerId!==e.pointerId)return;
   const dx=e.clientX-trackSwipeState.startX;
   const ids=getBoardIds();
@@ -1129,6 +1163,7 @@ wrapper.addEventListener('pointermove',e=>{
 },{passive:true});
 
 wrapper.addEventListener('pointerup',e=>{
+  if(isCloudBlocked)return;
   if(!trackSwipeState||trackSwipeState.pointerId!==e.pointerId)return;
   const sw=trackSwipeState; trackSwipeState=null;
   const dx=e.clientX-sw.startX;
@@ -1157,7 +1192,9 @@ newBoardInput.addEventListener('keydown',e=>{if(e.key==='Enter'){const n=newBoar
 function init() {
   if (isNoUI) document.body.classList.add('no-ui');
   updateBadge();
-  if (isEdit && localStorage.getItem('afl_coach_verified') !== 'true') {
+  if (!isDemo && !hasCloudConfig()) {
+    loadFromCloud();
+  } else if (isEdit && localStorage.getItem('afl_coach_verified') !== 'true') {
     pwOverlay.classList.add('show');
     pwInput.focus();
   } else {
@@ -1168,7 +1205,7 @@ function init() {
 pwSubmit.onclick = () => {
   if (pwInput.value === 'Yadz') {
     localStorage.setItem('afl_coach_verified', 'true');
-    pwOverlay.classList.remove('show'); 
+    pwOverlay.classList.remove('show');
     loadFromCloud();
   } else {
     showMessage("INCORRECT PASSWORD");
