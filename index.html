@@ -377,7 +377,17 @@ document.addEventListener('contextmenu', e => { if (e.target.tagName !== 'INPUT'
 
 // ── HELPERS ──
 function genId(){return'b_'+Date.now();}
-function getBoardIds(){return Object.keys(allData.boards);}
+function getBoardIds(){
+  return Object.keys(allData.boards).sort((a,b)=>{
+    const an=allData.boards[a]?.name||'';
+    const bn=allData.boards[b]?.name||'';
+    return an.localeCompare(bn,undefined,{numeric:true,sensitivity:'base'})||a.localeCompare(b);
+  });
+}
+
+function getBoardElement(boardId){
+  return [...boardTrack.children].find(el=>el.dataset.boardId===boardId)||boardTrack.children[getBoardIds().indexOf(boardId)];
+}
 
 function ensureDefaultBoard(){
   if(getBoardIds().length===0){
@@ -387,6 +397,7 @@ function ensureDefaultBoard(){
 }
 
 function setCurrentBoard(id){
+  if(!allData.boards[id])id=getBoardIds()[0];
   currentBoardId=id;
   currentBoardIndex=getBoardIds().indexOf(id);
   roster=allData.boards[id].roster;
@@ -639,12 +650,13 @@ async function silentRefresh(){
   if(isDemo||isDirty||isSaving||isCloudBlocked)return;
   try{
     const keepBoardId=currentBoardId;
+    const oldIds=getBoardIds().join('|');
     allData=await readCloudData();
     ensureDefaultBoard();
     const ids=getBoardIds();
     const nextBoardId=allData.boards[keepBoardId]?keepBoardId:ids[0];
     setCurrentBoard(nextBoardId);
-    rebuildTrack();
+    if(oldIds!==ids.join('|')||boardTrack.children.length!==ids.length)rebuildTrack();
     renderAllBoards();
     renderBoardMenu();
     renderBoardIndicator();
@@ -710,7 +722,7 @@ function renderInventory(boardId){
           ev.preventDefault();
           mag.setPointerCapture(ev.pointerId);
           const panelRect=panel.getBoundingClientRect();
-          const groundEl=boardTrack.children[currentBoardIndex];
+          const groundEl=getBoardElement(currentBoardId);
           const gR=groundEl.getBoundingClientRect();
           groundEl.appendChild(mag);
           dragState={
@@ -784,9 +796,10 @@ function closeBoardMenu(){
 function rebuildTrack(){
   const ids=getBoardIds();
   boardTrack.innerHTML = '';
-  ids.forEach(() => {
+  ids.forEach(id => {
     const g=document.createElement('div');
     g.className='ground';
+    g.dataset.boardId=id;
     g.style.width = wrapper.clientWidth + 'px';
     boardTrack.appendChild(g);
   });
@@ -821,6 +834,8 @@ function drawOval(groundEl){
 }
 
 function renderBoard(boardId,groundEl){
+  if(!groundEl||!allData.boards[boardId])return;
+  groundEl.dataset.boardId=boardId;
   groundEl.querySelectorAll('.zone-label,.pos-slot,.magnet,.divider,.bg,.inv-arrows').forEach(e=>e.remove());
   drawOval(groundEl);
   zones.forEach(z=>{
@@ -887,9 +902,8 @@ function renderBoard(boardId,groundEl){
 }
 
 function renderAllBoards(){
-  const ids=getBoardIds();
-  [...boardTrack.children].forEach((groundEl,i)=>{
-    renderBoard(ids[i],groundEl);
+  [...boardTrack.children].forEach(groundEl=>{
+    renderBoard(groundEl.dataset.boardId,groundEl);
   });
 }
 
@@ -938,7 +952,7 @@ function logicalTransfer(direction) {
     targetRoster[finalPosId] = playerData;
     
     // Reparent visually
-    ds.groundEl = boardTrack.children[nextIdx];
+    ds.groundEl = getBoardElement(nextId);
     ds.groundEl.appendChild(ds.el);
 
     // Update logical tracking
@@ -1164,7 +1178,7 @@ editSave.addEventListener('click', e => {
   } else {
     const r=allData.boards[boardId].roster;
     if(name)r[posId]={name,badge}; else delete r[posId];
-    saveToCloud(); renderBoard(boardId,boardTrack.children[getBoardIds().indexOf(boardId)]);
+    saveToCloud(); renderBoard(boardId,getBoardElement(boardId));
   }
   closeEdit();
 });
@@ -1177,7 +1191,7 @@ editClear.addEventListener('click', e => {
     saveToCloud(); renderInventory(boardId);
   } else {
     delete allData.boards[boardId].roster[posId];
-    saveToCloud(); renderBoard(boardId,boardTrack.children[getBoardIds().indexOf(boardId)]);
+    saveToCloud(); renderBoard(boardId,getBoardElement(boardId));
   }
   closeEdit();
 });

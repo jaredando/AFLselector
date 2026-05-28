@@ -53,11 +53,21 @@ function normalizeBoard(data) {
   };
 }
 
+function compareBoardMeta(a, b) {
+  const nameCompare = (a.name || "").localeCompare(b.name || "", undefined, {
+    numeric: true,
+    sensitivity: "base"
+  });
+  return nameCompare || (a.id || "").localeCompare(b.id || "");
+}
+
 function makeIndex(data) {
-  return Object.entries(data.boards).map(([id, board]) => ({
-    id,
-    name: typeof board?.name === "string" ? board.name : "Untitled"
-  }));
+  return Object.entries(data.boards)
+    .map(([id, board]) => ({
+      id,
+      name: typeof board?.name === "string" ? board.name : "Untitled"
+    }))
+    .sort(compareBoardMeta);
 }
 
 async function readFullData(env) {
@@ -68,7 +78,8 @@ async function readFullData(env) {
 
   if (Array.isArray(index)) {
     const boards = {};
-    const loadedBoards = await Promise.all(index.map(async ({ id, name }) => {
+    const orderedIndex = [...index].sort(compareBoardMeta);
+    const loadedBoards = await Promise.all(orderedIndex.map(async ({ id, name }) => {
       const board = await getJsonValue(env, BOARD_KEY_PREFIX + id);
       return [id, normalizeBoard(board) || { name: name || "Untitled", roster: {}, inventory: {} }];
     }));
