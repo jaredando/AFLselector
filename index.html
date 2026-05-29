@@ -56,6 +56,16 @@
   .pos-slot.filled{border:none;background:transparent;pointer-events:none}
   .magnet{z-index:50;background:#fff;color:#073175;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;display:flex;align-items:center;padding:0 4px 0 16px;cursor:grab;box-shadow:0 2px 6px rgba(0,0,0,0.3);white-space:nowrap;transition:color 0.2s ease;}
   .magnet.warning{color:#b00000!important;}
+  /* Carry-progress ring shown while holding the magnet inside an edge zone */
+  .magnet.carrying::before{
+    content:'';position:absolute;left:-6px;top:50%;transform:translateY(-50%);
+    width:34px;height:34px;border-radius:50%;pointer-events:none;
+    background:conic-gradient(rgba(96,165,250,0.95) calc(var(--carry-progress,0)*360deg), rgba(255,255,255,0.18) 0);
+    -webkit-mask:radial-gradient(circle, transparent 13px, #000 14px);
+            mask:radial-gradient(circle, transparent 13px, #000 14px);
+    opacity:0;transition:opacity 0.15s ease;z-index:-1;
+  }
+  .magnet.carrying.in-zone::before{opacity:1;}
   .mag-name{width:100%;text-align:left;overflow:hidden;text-overflow:ellipsis;}
   .magnet.is-bench{width:60px!important;font-size:12px!important;padding:0 2px 0 12px!important;}
   .pos-slot.is-bench{width:70px!important;padding:0 !important;}
@@ -63,7 +73,7 @@
 
   /* ── Edge carry indicators ── */
   .edge-indicator{
-    position:fixed;top:0;bottom:0;width:48px;z-index:60;pointer-events:none;
+    position:fixed;top:0;bottom:0;width:64px;z-index:60;pointer-events:none;
     opacity:0;transition:opacity 0.2s ease;
     display:flex;align-items:center;
   }
@@ -78,8 +88,13 @@
     justify-content:flex-start;padding-left:6px;
   }
   .edge-indicator.show{opacity:1;}
-  .edge-indicator::after{content:'›';font-size:28px;color:rgba(255,255,255,0.7);font-family:'Bebas Neue',sans-serif;}
-  #edgeIndicatorLeft::after{content:'‹';}
+  .edge-indicator .edge-arrow{font-size:28px;color:rgba(255,255,255,0.7);font-family:'Bebas Neue',sans-serif;line-height:1;}
+  .edge-indicator .edge-target{
+    font-family:'Bebas Neue',sans-serif;font-size:11px;letter-spacing:2px;
+    color:rgba(255,255,255,0.85);writing-mode:vertical-rl;text-orientation:mixed;
+    transform:rotate(180deg);margin:8px 0;max-height:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  #edgeIndicatorLeft .edge-target{transform:none;}
 
   /* ── Toast Messages ── */
   #toastOverlay{
@@ -235,8 +250,14 @@
     <div id="boardTrack"></div>
   </div>
   <!-- Indicators -->
-  <div id="edgeIndicatorRight" class="edge-indicator"></div>
-  <div id="edgeIndicatorLeft" class="edge-indicator"></div>
+  <div id="edgeIndicatorRight" class="edge-indicator">
+    <span class="edge-target" id="edgeTargetRight"></span>
+    <span class="edge-arrow">›</span>
+  </div>
+  <div id="edgeIndicatorLeft" class="edge-indicator">
+    <span class="edge-arrow">‹</span>
+    <span class="edge-target" id="edgeTargetLeft"></span>
+  </div>
   <div id="boardIndicator"></div>
   <div id="syncStatus"></div>
 
@@ -306,10 +327,14 @@ const CLOUD_FAILURE_LIMIT=5;
 const CLOUD_RETRY_MS=5000;
 const COACH_PASSWORD='Yadz2026';
 const COACH_AUTH_KEY='afl_coach_verified';
-const MAGNET_EDGE_ZONE_RATIO=0.08;
-const MAGNET_EDGE_HOLD_MS=850;
-const MAGNET_EDGE_SLIDE_MS=520;
-const MAGNET_EDGE_PREVIEW_RATIO=0.14;
+// Edge-zone tuning (iOS Springboard-style spatial re-entry, not time-based).
+const MAGNET_EDGE_ZONE_RATIO=0.08;       // Strict trigger zone — finger must enter this to COMMIT a transfer.
+const MAGNET_EDGE_APPROACH_RATIO=0.18;   // Wider approach zone — board peeks proportionally as finger nears edge.
+const MAGNET_EDGE_EXIT_RATIO=0.22;       // Wider zone the finger must exit to re-arm (hysteresis).
+const MAGNET_EDGE_HOLD_MS=450;           // Deliberate dwell before commit slide begins.
+const MAGNET_EDGE_SLIDE_MS=350;          // Commit slide animation length once dwell completes.
+const MAGNET_EDGE_APPROACH_HOLD_MS=400;  // Ramp-in time after entering approach zone before peek reaches full strength.
+const MAGNET_EDGE_PREVIEW_RATIO=0.16;    // Max peek depth (fraction of board width) before commit.
 const BOARD_SWIPE_DISTANCE_RATIO=0.18;
 const BOARD_SWIPE_VELOCITY=0.28;
 const BOARD_SWIPE_VERTICAL_SLOP=42;
@@ -320,6 +345,8 @@ const syncStatus=document.getElementById('syncStatus'),
       boardTrack=document.getElementById('boardTrack'),
       edgeIndicatorRight=document.getElementById('edgeIndicatorRight'),
       edgeIndicatorLeft=document.getElementById('edgeIndicatorLeft'),
+      edgeTargetRight=document.getElementById('edgeTargetRight'),
+      edgeTargetLeft=document.getElementById('edgeTargetLeft'),
       toastOverlay=document.getElementById('toastOverlay'),
       overlay=document.getElementById('editOverlay'),
       editTitle=document.getElementById('editTitle'),
@@ -743,8 +770,9 @@ function renderInventory(boardId){
             curY:((ev.clientY-gR.top)/gR.height)*100,
             originalPlayerName:name,lastScrollOffset:0,
             hasLanded:false,currentLogicalIndex:currentBoardIndex,
-            edgeLock:null
+            requiresExitDirection:null
           };
+          mag.classList.add('carrying');
         });
       } else { mag.style.cursor='default'; }
       panel.appendChild(mag);
@@ -888,12 +916,13 @@ function renderBoard(boardId,groundEl){
             offX: e.clientX - (gR.left + (p.x/100)*gR.width),
             offY: e.clientY - (gR.top + (p.y/100)*gR.height),
             curX:p.x, curY:p.y,
-            originalPlayerName: name, 
+            originalPlayerName: name,
             lastScrollOffset: 0,
             hasLanded: false,
             currentLogicalIndex: currentBoardIndex,
-            edgeLock: null
+            requiresExitDirection: null
           };
+          mag.classList.add('carrying');
         });
       } else { mag.style.cursor = 'default'; }
       groundEl.appendChild(mag);
@@ -911,6 +940,15 @@ function renderBoard(boardId,groundEl){
 function renderAllBoards(){
   [...boardTrack.children].forEach(groundEl=>{
     renderBoard(groundEl.dataset.boardId,groundEl);
+  });
+}
+
+// Re-render only the boards in `ids` (Set or array). Falls back to all boards.
+function rerenderBoards(ids){
+  if(!ids){ renderAllBoards(); return; }
+  const idSet = ids instanceof Set ? ids : new Set(ids);
+  [...boardTrack.children].forEach(groundEl=>{
+    if(idSet.has(groundEl.dataset.boardId)) renderBoard(groundEl.dataset.boardId,groundEl);
   });
 }
 
@@ -957,7 +995,7 @@ function logicalTransfer(direction) {
     const playerData = allData.boards[prevId].roster[ds.posId];
     delete allData.boards[prevId].roster[ds.posId];
     targetRoster[finalPosId] = playerData;
-    
+
     // Reparent visually
     ds.groundEl = getBoardElement(nextId);
     ds.groundEl.appendChild(ds.el);
@@ -968,7 +1006,14 @@ function logicalTransfer(direction) {
     currentBoardId = nextId;
     currentBoardIndex = nextIdx;
     roster = targetRoster;
-    
+
+    // Track which boards were touched so onEnd can re-render just these,
+    // and mark that a carry happened so onEnd skips its own drop-snap.
+    ds.didCarry = true;
+    ds.touchedBoards = ds.touchedBoards || new Set();
+    ds.touchedBoards.add(prevId);
+    ds.touchedBoards.add(nextId);
+
     // Update UI elements
     activeBoardNameEl.textContent = allData.boards[nextId].name;
     renderBoardIndicator();
@@ -998,66 +1043,208 @@ const onMove=e=>{
     let depth = 0;
     let direction = 0;
 
-    let inZone = 0;
-    if (e.clientX > wRect.right - triggerZone) inZone = 1;
-    else if (e.clientX < wRect.left + triggerZone) inZone = -1;
+    // Three concentric zones:
+    //   • Approach zone (wide, ~30%):   board peeks PROPORTIONALLY to finger depth — instant visual response.
+    //   • Trigger zone (narrow, ~8%):  starts a dwell timer that, when complete, COMMITS the transfer.
+    //   • Exit zone (wider, ~22%):     finger must leave this to RE-ARM after a transfer (hysteresis).
+    const approachZoneR = wRect.right - W * MAGNET_EDGE_APPROACH_RATIO;
+    const approachZoneL = wRect.left  + W * MAGNET_EDGE_APPROACH_RATIO;
+    const triggerZoneR  = wRect.right - W * MAGNET_EDGE_ZONE_RATIO;
+    const triggerZoneL  = wRect.left  + W * MAGNET_EDGE_ZONE_RATIO;
+    const exitZoneR     = wRect.right - W * MAGNET_EDGE_EXIT_RATIO;
+    const exitZoneL     = wRect.left  + W * MAGNET_EDGE_EXIT_RATIO;
 
-    if (inZone === 0) {
+    // Approach progress: 0 at the approach line, 1 at the very edge.
+    let approachR = 0, approachL = 0;
+    if (e.clientX > approachZoneR) {
+      approachR = Math.min(1, (e.clientX - approachZoneR) / (wRect.right - approachZoneR));
+    }
+    if (e.clientX < approachZoneL) {
+      approachL = Math.min(1, (approachZoneL - e.clientX) / (approachZoneL - wRect.left));
+    }
+
+    let inTriggerZone = 0;
+    if (e.clientX > triggerZoneR) inTriggerZone = 1;
+    else if (e.clientX < triggerZoneL) inTriggerZone = -1;
+
+    let inExitZone = 0;
+    if (e.clientX > exitZoneR) inExitZone = 1;
+    else if (e.clientX < exitZoneL) inExitZone = -1;
+
+    const now = Date.now();
+    let holdProgressForRing = 0;
+
+    // ── DIRECTIONAL INTENT FILTER ──
+    // Track recent motion direction so vertical placement near the edges
+    // doesn't accidentally trigger a horizontal board scroll. We keep an
+    // exponentially-smoothed average of |dx| and |dy| since the last move,
+    // then derive a horizontal-intent score in [0..1].
+    if (dragState.lastMoveX === undefined) {
+      dragState.lastMoveX = e.clientX;
+      dragState.lastMoveY = e.clientY;
+      dragState.recentAbsDx = 0;
+      dragState.recentAbsDy = 0;
+    }
+    const moveDx = Math.abs(e.clientX - dragState.lastMoveX);
+    const moveDy = Math.abs(e.clientY - dragState.lastMoveY);
+    dragState.lastMoveX = e.clientX;
+    dragState.lastMoveY = e.clientY;
+    const INTENT_ALPHA = 0.28;
+    dragState.recentAbsDx = dragState.recentAbsDx * (1 - INTENT_ALPHA) + moveDx * INTENT_ALPHA;
+    dragState.recentAbsDy = dragState.recentAbsDy * (1 - INTENT_ALPHA) + moveDy * INTENT_ALPHA;
+    const totalRecent = dragState.recentAbsDx + dragState.recentAbsDy;
+    // Below this much smoothed motion we don't have enough signal — keep prior intent (default 1).
+    const horizontalIntent = totalRecent > 0.4
+      ? dragState.recentAbsDx / totalRecent
+      : 1;
+    // Map intent → multiplier:
+    //   ≤ 0.35 (mostly vertical): suppress entirely (0)
+    //   ≥ 0.60 (clearly horizontal): full effect (1)
+    //   in between: smooth linear ramp
+    const intentMultiplier = Math.max(0, Math.min(1, (horizontalIntent - 0.35) / 0.25));
+
+    // ── Spatial re-arm (iOS Springboard pattern) ──
+    if (dragState.requiresExitDirection) {
+      if (inExitZone !== dragState.requiresExitDirection) {
+        dragState.requiresExitDirection = null;
+      }
+    }
+    const armed = !dragState.requiresExitDirection;
+
+    // Track when the finger first entered the approach zone (resets if it leaves
+    // or switches sides). The peek ramps in over MAGNET_EDGE_APPROACH_HOLD_MS so
+    // a quick brush past the edge doesn't trigger any visible movement.
+    const currentApproachDir = approachR > 0 ? 1 : (approachL > 0 ? -1 : 0);
+    if (currentApproachDir === 0) {
+      dragState.approachEnterTime = null;
+      dragState.approachEnterDir = 0;
+    } else if (dragState.approachEnterDir !== currentApproachDir) {
+      dragState.approachEnterTime = now;
+      dragState.approachEnterDir = currentApproachDir;
+    }
+    const approachDwellProgress = dragState.approachEnterTime !== null
+      ? Math.min(1, (now - dragState.approachEnterTime) / MAGNET_EDGE_APPROACH_HOLD_MS)
+      : 0;
+
+    // ── 1) APPROACH PEEK (proportional, always active while armed) ──
+    // Board peeks toward the destination based on finger depth in the approach zone,
+    // capped at PREVIEW_RATIO. This gives immediate visual feedback well before
+    // the finger reaches the strict trigger zone. Scaled by horizontal intent so
+    // vertical placement near edges doesn't pull the board sideways, and by the
+    // dwell progress so a quick brush doesn't trigger peek.
+    let approachOffset = 0;
+    if (armed) {
+      if (approachR > 0 && hasNext) {
+        approachOffset = -W * MAGNET_EDGE_PREVIEW_RATIO * approachR * intentMultiplier * approachDwellProgress;
+      } else if (approachL > 0 && hasPrev) {
+        approachOffset = W * MAGNET_EDGE_PREVIEW_RATIO * approachL * intentMultiplier * approachDwellProgress;
+      }
+    }
+
+    // Gate the trigger zone the same way — if the finger isn't moving horizontally
+    // enough to count as a swipe, don't even start the dwell timer.
+    const TRIGGER_INTENT_THRESHOLD = 0.45;
+    if (intentMultiplier < TRIGGER_INTENT_THRESHOLD) {
+      inTriggerZone = 0;
+    }
+
+    // ── 2) DWELL + COMMIT SLIDE (only inside the strict trigger zone) ──
+    let commitOffset = null;  // null means "use approachOffset"
+    if (inTriggerZone === 0 || !armed) {
       dragState.zoneEnterTime = null;
       dragState.edgeZoneDirection = null;
       dragState.edgeSlideStartTime = null;
-      dragState.edgeLock = null; // Reset lock once user brings magnet back towards the center
     } else {
-      const hasBoardInZone = inZone === 1 ? hasNext : hasPrev;
-      const isLockedInZone = (inZone === 1 && dragState.edgeLock === 'right') || (inZone === -1 && dragState.edgeLock === 'left');
-      if (!hasBoardInZone || isLockedInZone) {
+      const hasBoardInZone = inTriggerZone === 1 ? hasNext : hasPrev;
+      if (!hasBoardInZone) {
         dragState.zoneEnterTime = null;
         dragState.edgeZoneDirection = null;
         dragState.edgeSlideStartTime = null;
       } else {
-        if (dragState.edgeZoneDirection !== inZone) {
-          dragState.edgeZoneDirection = inZone;
-          dragState.zoneEnterTime = Date.now();
+        if (dragState.edgeZoneDirection !== inTriggerZone) {
+          dragState.edgeZoneDirection = inTriggerZone;
+          dragState.zoneEnterTime = now;
           dragState.edgeSlideStartTime = null;
         }
 
-        const now = Date.now();
         const holdProgress = Math.min(1, (now - dragState.zoneEnterTime) / MAGNET_EDGE_HOLD_MS);
         if (holdProgress < 1) {
-          proportionalOffset = inZone * -W * MAGNET_EDGE_PREVIEW_RATIO * holdProgress;
+          // Dwell phase: visual stays at approachOffset (which is already ≈ PREVIEW_RATIO since finger is at edge).
+          holdProgressForRing = holdProgress * 0.5;
         } else {
+          // Commit slide: peek grows beyond PREVIEW_RATIO toward full board width.
           if (!dragState.edgeSlideStartTime) dragState.edgeSlideStartTime = now;
           const rawSlideProgress = Math.min(1, (now - dragState.edgeSlideStartTime) / MAGNET_EDGE_SLIDE_MS);
           const easedSlideProgress = rawSlideProgress < 0.5
             ? 2 * rawSlideProgress * rawSlideProgress
             : 1 - Math.pow(-2 * rawSlideProgress + 2, 2) / 2;
           const offsetRatio = MAGNET_EDGE_PREVIEW_RATIO + (1 - MAGNET_EDGE_PREVIEW_RATIO) * easedSlideProgress;
-          proportionalOffset = inZone * -W * offsetRatio;
+          commitOffset = inTriggerZone * -W * offsetRatio;
+          holdProgressForRing = 0.5 + 0.5 * rawSlideProgress;
           if (rawSlideProgress >= 1) {
-            direction = inZone;
+            direction = inTriggerZone;
             depth = 1;
           }
         }
       }
     }
 
-    // Apply scroll if a board exists in that direction, and we aren't locked
-    if (direction === 1 && hasNext && dragState.edgeLock !== 'right') {
+    // Compose: commit slide overrides approach peek when active.
+    proportionalOffset = commitOffset !== null ? commitOffset : approachOffset;
+
+    // Apply scroll if a board exists in that direction
+    if (direction === 1 && hasNext) {
       const cappedDepth = Math.min(1.0, Math.max(0, depth));
       proportionalOffset = -Math.max(MAGNET_EDGE_PREVIEW_RATIO, cappedDepth) * W;
       if (cappedDepth >= 1.0) {
         transferTriggered = 1;
-        dragState.edgeLock = 'right'; // lock this edge so we stop scrolling
+        // After this transfer, the finger MUST leave the right exit zone before another can fire.
+        dragState.requiresExitDirection = 1;
+        // Reset the dwell timer so it can't accidentally double-count.
+        dragState.zoneEnterTime = null;
+        dragState.edgeZoneDirection = null;
+        dragState.edgeSlideStartTime = null;
+        if (navigator.vibrate) navigator.vibrate(8); // Subtle haptic on transfer (mobile only).
       }
-    } else if (direction === -1 && hasPrev && dragState.edgeLock !== 'left') {
+    } else if (direction === -1 && hasPrev) {
       const cappedDepth = Math.min(1.0, Math.max(0, depth));
       proportionalOffset = Math.max(MAGNET_EDGE_PREVIEW_RATIO, cappedDepth) * W;
       if (cappedDepth >= 1.0) {
         transferTriggered = -1;
-        dragState.edgeLock = 'left';
+        dragState.requiresExitDirection = -1;
+        dragState.zoneEnterTime = null;
+        dragState.edgeZoneDirection = null;
+        dragState.edgeSlideStartTime = null;
+        if (navigator.vibrate) navigator.vibrate(8);
       }
     } else if ((direction === 1 && !hasNext) || (direction === -1 && !hasPrev)) {
       proportionalOffset = 0;
+    }
+
+    // ── EDGE INDICATOR + PROGRESS RING FEEDBACK ──
+    const activeEdgeDir = dragState.edgeZoneDirection;
+    const showEdge = activeEdgeDir && armed;
+    if (showEdge) {
+      const targetIdx = dragState.currentLogicalIndex + activeEdgeDir;
+      const targetName = (targetIdx >= 0 && targetIdx < ids.length)
+        ? (allData.boards[ids[targetIdx]]?.name || '')
+        : '';
+      if (activeEdgeDir === 1) {
+        edgeTargetRight.textContent = targetName;
+        edgeIndicatorRight.classList.add('show');
+        edgeIndicatorLeft.classList.remove('show');
+      } else {
+        edgeTargetLeft.textContent = targetName;
+        edgeIndicatorLeft.classList.add('show');
+        edgeIndicatorRight.classList.remove('show');
+      }
+      dragState.el.classList.add('carrying','in-zone');
+      dragState.el.style.setProperty('--carry-progress', holdProgressForRing.toFixed(3));
+    } else {
+      edgeIndicatorRight.classList.remove('show');
+      edgeIndicatorLeft.classList.remove('show');
+      dragState.el.classList.remove('in-zone');
+      dragState.el.style.setProperty('--carry-progress', '0');
     }
 
     // If we transition to a new board, instantly reset offset so index natively handles it
@@ -1089,6 +1276,12 @@ const onEnd=e=>{
   dragState.el.releasePointerCapture(e.pointerId);
   const ds=dragState;
   dragState=null;
+
+  // Clear edge feedback unconditionally — drag has ended.
+  edgeIndicatorRight.classList.remove('show');
+  edgeIndicatorLeft.classList.remove('show');
+  ds.el.classList.remove('carrying','in-zone');
+  ds.el.style.removeProperty('--carry-progress');
 
   if(!ds.moved){
     suppressClick = true;
@@ -1130,6 +1323,15 @@ const onEnd=e=>{
     }
   }
 
+  // If the label was carried across boards via logicalTransfer, the slot is
+  // already chosen — don't run nearest-slot snapping again (it would land the
+  // label at the edge instead of the intended slot).
+  if(ds.didCarry){
+    saveToCloud();
+    rerenderBoards(ds.touchedBoards);
+    return;
+  }
+
   // ── DROP ON FIELD (including from inventory) ──
   let best=null,bd=Infinity;
   const snapX=Math.max(0,Math.min(100,ds.curX));
@@ -1147,7 +1349,7 @@ const onEnd=e=>{
       // Swap with existing field player back to inventory
       if(allData.boards[currentBoardId].roster[best.id]) inv[ds.invId]=allData.boards[currentBoardId].roster[best.id];
       allData.boards[currentBoardId].roster[best.id]=playerData;
-      saveToCloud(); renderAllBoards(); renderInventory(currentBoardId);
+      saveToCloud(); rerenderBoards([currentBoardId]); renderInventory(currentBoardId);
     } else {
       // No valid snap — return to inventory
       renderInventory(currentBoardId);
@@ -1164,7 +1366,7 @@ const onEnd=e=>{
     }
     allData.boards[currentBoardId].roster[best.id]=dData;
   }
-  saveToCloud(); renderAllBoards();
+  saveToCloud(); rerenderBoards([currentBoardId]);
 };
 
 document.onpointermove=onMove; document.onpointerup=onEnd;
