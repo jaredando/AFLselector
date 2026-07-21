@@ -1966,16 +1966,23 @@ eligibilitySheet.addEventListener('keydown',event=>{
 });
 
 // ── INIT ──
+function removeCoachPasswordField(){
+  pwInput.value='';
+  pwOverlay.remove();
+}
+
 function init() {
   if (isNoUI) document.body.classList.add('no-ui');
   updateBadge();
   showEligibilityTip();
   if (!isDemo && !hasCloudConfig()) {
+    removeCoachPasswordField();
     loadFromCloud();
   } else if (needsCoachPassword()) {
     pwOverlay.classList.add('show');
     pwInput.focus();
   } else {
+    removeCoachPasswordField();
     loadFromCloud();
   }
 }
@@ -1983,7 +1990,7 @@ function init() {
 function verifyCoachAccess(){
   if (pwInput.value === COACH_PASSWORD) {
     localStorage.setItem(COACH_AUTH_KEY, 'true');
-    pwOverlay.classList.remove('show');
+    removeCoachPasswordField();
     loadFromCloud();
   } else {
     showMessage("INCORRECT PASSWORD");
