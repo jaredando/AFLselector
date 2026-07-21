@@ -377,10 +377,10 @@
   </div>
   <div class="eligibility-controls">
     <label for="eligibilitySearch" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">Search player name</label>
-    <div class="eligibility-search-wrap">
+    <form class="eligibility-search-wrap" id="eligibilitySearchForm" role="search" autocomplete="off">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
       <input id="eligibilitySearch" name="player_lookup_query" type="search" role="searchbox" placeholder="Search a player…" autocomplete="off" inputmode="search" enterkeyhint="search" autocapitalize="none" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other" />
-    </div>
+    </form>
     <div class="eligibility-grade-picker" role="group" aria-label="Finals grade">
       <button class="eligibility-grade-btn active" type="button" data-grade="MD3" aria-pressed="true">DIV 3 FINALS</button>
       <button class="eligibility-grade-btn" type="button" data-grade="MD5" aria-pressed="false">DIV 5 FINALS</button>
@@ -395,11 +395,11 @@
 
 <!-- Password Overlay -->
 <div id="pwOverlay">
-  <div class="pw-box">
+  <form class="pw-box" id="pwForm" autocomplete="off">
     <div style="font-family:'Bebas Neue',sans-serif; font-size:20px; color:#60a5fa; letter-spacing:2px; text-align:center;">COACH ACCESS</div>
-    <input type="password" id="pwInput" placeholder="Password...">
-    <button id="pwSubmit">LOGIN</button>
-  </div>
+    <input type="password" id="pwInput" name="club_access_code" placeholder="Password..." autocomplete="one-time-code" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other">
+    <button id="pwSubmit" type="submit">LOGIN</button>
+  </form>
 </div>
 
 <!-- Board menu -->
@@ -487,6 +487,7 @@ const syncStatus=document.getElementById('syncStatus'),
       boardListEl=document.getElementById('boardList'),
       modeBadge=document.getElementById('modeBadge'),
       pwOverlay=document.getElementById('pwOverlay'),
+      pwForm=document.getElementById('pwForm'),
       pwInput=document.getElementById('pwInput'),
       pwSubmit=document.getElementById('pwSubmit'),
       cloudBlocker=document.getElementById('cloudBlocker'),
@@ -498,6 +499,7 @@ const eligibilityBtn=document.getElementById('eligibilityBtn'),
       eligibilitySheet=document.getElementById('eligibilitySheet'),
       eligibilityClose=document.getElementById('eligibilityClose'),
       eligibilityRefresh=document.getElementById('eligibilityRefresh'),
+      eligibilitySearchForm=document.getElementById('eligibilitySearchForm'),
       eligibilitySearch=document.getElementById('eligibilitySearch'),
       eligibilityResults=document.getElementById('eligibilityResults'),
       eligibilityCount=document.getElementById('eligibilityCount'),
@@ -1921,7 +1923,6 @@ function openEligibility(){
   eligibilityBtn.setAttribute('aria-expanded','true');
   document.getElementById('app').inert=true;
   selectEligibilityGrade(gradeFromCurrentBoard());
-  setTimeout(()=>eligibilitySearch.focus(),80);
   if(!eligibilityCacheIsFresh(eligibilityData))eligibilityData=null;
   if(!eligibilityData)loadEligibility();else renderEligibility();
 }
@@ -1945,6 +1946,7 @@ eligibilityRefresh.addEventListener('click',()=>{
   }
   loadEligibility(true);
 });
+eligibilitySearchForm.addEventListener('submit',event=>event.preventDefault());
 eligibilitySearch.addEventListener('input',renderEligibility);
 document.querySelectorAll('.eligibility-grade-btn').forEach(button=>button.addEventListener('click',()=>selectEligibilityGrade(button.dataset.grade)));
 eligibilityTipAction.addEventListener('click',openEligibility);
@@ -1978,7 +1980,7 @@ function init() {
   }
 }
 
-pwSubmit.onclick = () => {
+function verifyCoachAccess(){
   if (pwInput.value === COACH_PASSWORD) {
     localStorage.setItem(COACH_AUTH_KEY, 'true');
     pwOverlay.classList.remove('show');
@@ -1988,8 +1990,11 @@ pwSubmit.onclick = () => {
     pwInput.value='';
     pwInput.focus();
   }
-};
-pwInput.onkeydown = e => { if(e.key === 'Enter') pwSubmit.onclick(); };
+}
+pwForm.addEventListener('submit',event=>{
+  event.preventDefault();
+  verifyCoachAccess();
+});
 
 init();
 </script>
