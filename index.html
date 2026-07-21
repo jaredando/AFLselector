@@ -182,7 +182,7 @@
   .eligibility-meta{min-height:16px;font-size:11px;color:rgba(255,255,255,.5);letter-spacing:.25px;display:flex;justify-content:space-between;gap:8px;}
   .eligibility-table-wrap{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;touch-action:pan-x pan-y;-webkit-overflow-scrolling:touch;border-top:1px solid rgba(255,255,255,.08);}
   .eligibility-table-wrap *{touch-action:pan-x pan-y;}
-  .eligibility-table{width:100%;min-width:570px;border-collapse:separate;border-spacing:0;font-size:13px;}
+  .eligibility-table{width:100%;min-width:540px;border-collapse:separate;border-spacing:0;font-size:13px;}
   .eligibility-table th{position:sticky;top:0;z-index:2;height:42px;background:#0a2147;color:rgba(255,255,255,.62);font-size:10px;letter-spacing:.8px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.12);padding:0 10px;text-align:center;white-space:nowrap;}
   .eligibility-table th:first-child,.eligibility-table td:first-child{position:sticky;left:0;text-align:left;width:1%;min-width:max-content;max-width:none;padding-left:8px;padding-right:8px;}
   .eligibility-table th:first-child{z-index:3;background:#0a2147;}
@@ -190,12 +190,15 @@
   .eligibility-table td:first-child{z-index:1;background:#071a38;color:#fff;font-size:14px;font-weight:700;white-space:nowrap;box-shadow:8px 0 12px -12px #000;}
   .eligibility-table tbody tr:nth-child(even) td{background:#091f43;}
   .eligibility-table tbody tr:nth-child(even) td:first-child{background:#091f43;}
-  .game-count{display:inline-flex;min-width:28px;height:28px;border-radius:14px;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);}
+  .eligibility-games-col{width:44px;min-width:44px;max-width:44px;padding-left:5px!important;padding-right:5px!important;}
+  .eligibility-games-col.selected-grade{box-shadow:inset 1px 0 rgba(96,165,250,.24),inset -1px 0 rgba(96,165,250,.24);}
+  .eligibility-table th.eligibility-games-col.selected-grade{color:#dbeafe;box-shadow:inset 1px 0 rgba(96,165,250,.24),inset -1px 0 rgba(96,165,250,.24),inset 0 -2px #60a5fa;}
+  .game-count{display:inline-flex;min-width:26px;height:26px;border-radius:13px;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);}
   .game-count.building{color:#93c5fd;border-color:rgba(96,165,250,.38);background:rgba(59,130,246,.11);font-weight:700;}
   .game-count.close{color:#fde68a;border-color:rgba(234,179,8,.48);background:rgba(234,179,8,.12);font-weight:700;}
   .game-count.risk{color:#fdba74;border-color:rgba(249,115,22,.58);background:rgba(249,115,22,.16);font-weight:800;}
   .game-count.critical{color:#fecaca;border-color:rgba(239,68,68,.68);background:rgba(239,68,68,.18);font-weight:800;}
-  .eligibility-status{display:inline-grid;gap:3px;min-width:126px;padding:3px;border-radius:7px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.025);text-align:left;line-height:1;}
+  .eligibility-status{display:inline-grid;gap:3px;min-width:120px;padding:3px;border-radius:7px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.025);text-align:left;line-height:1;}
   .eligibility-status-line{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 6px;border-radius:4px;white-space:nowrap;}
   .eligibility-status-line strong{font-size:9px;letter-spacing:.5px;}
   .eligibility-status-line span{font-size:9px;color:rgba(255,255,255,.68);}
@@ -203,7 +206,6 @@
   .eligibility-status-line.building{color:#bfdbfe;background:rgba(59,130,246,.1);}
   .eligibility-status-line.risk{color:#fdba74;background:rgba(249,115,22,.16);}
   .eligibility-status-line.locked{color:#fecaca;background:rgba(239,68,68,.18);}
-  .eligibility-status-line.clear{color:#cbd5e1;background:rgba(148,163,184,.09);}
   .eligibility-state{padding:38px 22px;text-align:center;color:rgba(255,255,255,.55);font-size:15px;line-height:1.45;}
   .eligibility-state strong{display:block;color:#dbeafe;font-size:18px;margin-bottom:5px;}
   .eligibility-reload-cta{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-top:18px;padding:0 18px;border:1px solid rgba(251,191,36,.55);border-radius:8px;background:#f59e0b;color:#172554;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;letter-spacing:.6px;cursor:pointer;}
@@ -1709,18 +1711,19 @@ function eligibilityStatusElement(status){
   };
 
   const hasQualified=status.qualifyingGames>=6;
+  if(status.higherGames>=7){
+    pill.appendChild(statusLine('locked','LOCKED OUT',`${status.higherGames} higher`));
+    return pill;
+  }
+
   pill.appendChild(statusLine(
     hasQualified?'qualified':'building',
     hasQualified?'QUALIFIED':`NEEDS ${status.gamesToQualify}`,
     `${status.qualifyingGames}/6 eligible`
   ));
 
-  if(status.higherGames>=7){
-    pill.appendChild(statusLine('locked','LOCKED OUT',`${status.higherGames} higher`));
-  }else if(status.higherGames===6){
+  if(status.higherGames===6){
     pill.appendChild(statusLine('risk','AT RISK','6 higher · 1 left'));
-  }else{
-    pill.appendChild(statusLine('clear','CAP CLEAR',`${status.higherGames}/7 higher`));
   }
   return pill;
 }
@@ -1784,6 +1787,19 @@ function compareEligibilityRisk(a,b){
   return a.name.localeCompare(b.name,'en-AU');
 }
 
+function centerEligibilityGradeColumn(table){
+  const target=table.querySelector(`th[data-grade="${selectedEligibilityGrade}"]`);
+  const stickyPlayerColumn=table.querySelector('th:first-child');
+  if(!target||!stickyPlayerColumn)return;
+
+  requestAnimationFrame(()=>{
+    const availableWidth=Math.max(0,eligibilityResults.clientWidth-stickyPlayerColumn.offsetWidth);
+    const desiredLeft=target.offsetLeft-stickyPlayerColumn.offsetWidth-(availableWidth-target.offsetWidth)/2;
+    const maxLeft=Math.max(0,eligibilityResults.scrollWidth-eligibilityResults.clientWidth);
+    eligibilityResults.scrollLeft=Math.max(0,Math.min(maxLeft,desiredLeft));
+  });
+}
+
 function renderEligibility(){
   if(!eligibilityData)return;
   const term=eligibilitySearch.value.trim().toLocaleLowerCase('en-AU');
@@ -1817,6 +1833,9 @@ function renderEligibility(){
     th.scope='col';
     th.textContent=team.shortName;
     th.title=team.name;
+    th.dataset.grade=team.shortName;
+    th.className='eligibility-games-col';
+    if(team.shortName===selectedEligibilityGrade)th.classList.add('selected-grade');
     headerRow.appendChild(th);
   });
   thead.appendChild(headerRow);
@@ -1837,6 +1856,8 @@ function renderEligibility(){
     row.appendChild(statusCell);
     eligibilityData.teams.forEach(team=>{
       const cell=document.createElement('td');
+      cell.className='eligibility-games-col';
+      if(team.shortName===selectedEligibilityGrade)cell.classList.add('selected-grade');
       cell.appendChild(gameCountElement(player.games[team.shortName]||0));
       row.appendChild(cell);
     });
@@ -1845,6 +1866,7 @@ function renderEligibility(){
   table.append(thead,tbody);
   eligibilityResults.replaceChildren(table);
   eligibilityResults.scrollTop=0;
+  centerEligibilityGradeColumn(table);
 }
 
 function showWeeklyRefreshRequired(message='The weekly cache has expired. One coach can reload PlayHQ, then everyone uses that snapshot until next Sunday evening.'){
