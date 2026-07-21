@@ -184,10 +184,10 @@
   .eligibility-table-wrap *{touch-action:pan-x pan-y;}
   .eligibility-table{width:100%;min-width:570px;border-collapse:separate;border-spacing:0;font-size:13px;}
   .eligibility-table th{position:sticky;top:0;z-index:2;height:42px;background:#0a2147;color:rgba(255,255,255,.62);font-size:10px;letter-spacing:.8px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.12);padding:0 10px;text-align:center;white-space:nowrap;}
-  .eligibility-table th:first-child,.eligibility-table td:first-child{position:sticky;left:0;text-align:left;min-width:142px;max-width:142px;}
+  .eligibility-table th:first-child,.eligibility-table td:first-child{position:sticky;left:0;text-align:left;width:1%;min-width:max-content;max-width:none;padding-left:8px;padding-right:8px;}
   .eligibility-table th:first-child{z-index:3;background:#0a2147;}
-  .eligibility-table td{height:47px;padding:0 10px;text-align:center;border-bottom:1px solid rgba(255,255,255,.07);background:#071a38;color:rgba(255,255,255,.72);font-variant-numeric:tabular-nums;}
-  .eligibility-table td:first-child{z-index:1;background:#071a38;color:#fff;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:8px 0 12px -12px #000;}
+  .eligibility-table td{height:61px;padding:0 10px;text-align:center;border-bottom:1px solid rgba(255,255,255,.07);background:#071a38;color:rgba(255,255,255,.72);font-variant-numeric:tabular-nums;}
+  .eligibility-table td:first-child{z-index:1;background:#071a38;color:#fff;font-size:14px;font-weight:700;white-space:nowrap;box-shadow:8px 0 12px -12px #000;}
   .eligibility-table tbody tr:nth-child(even) td{background:#091f43;}
   .eligibility-table tbody tr:nth-child(even) td:first-child{background:#091f43;}
   .game-count{display:inline-flex;min-width:28px;height:28px;border-radius:14px;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);}
@@ -195,13 +195,15 @@
   .game-count.close{color:#fde68a;border-color:rgba(234,179,8,.48);background:rgba(234,179,8,.12);font-weight:700;}
   .game-count.risk{color:#fdba74;border-color:rgba(249,115,22,.58);background:rgba(249,115,22,.16);font-weight:800;}
   .game-count.critical{color:#fecaca;border-color:rgba(239,68,68,.68);background:rgba(239,68,68,.18);font-weight:800;}
-  .eligibility-status{display:inline-flex;flex-direction:column;align-items:flex-start;min-width:104px;padding:5px 8px;border-radius:7px;border:1px solid rgba(255,255,255,.1);text-align:left;line-height:1.05;}
-  .eligibility-status strong{font-size:10px;letter-spacing:.55px;white-space:nowrap;}
-  .eligibility-status span{font-size:9px;margin-top:4px;color:rgba(255,255,255,.55);white-space:nowrap;}
-  .eligibility-status.qualified{color:#86efac;border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.1);}
-  .eligibility-status.risk{color:#fdba74;border-color:rgba(249,115,22,.58);background:rgba(249,115,22,.13);}
-  .eligibility-status.locked{color:#fecaca;border-color:rgba(239,68,68,.62);background:rgba(239,68,68,.15);}
-  .eligibility-status.building,.eligibility-status.no-games{color:#bfdbfe;border-color:rgba(96,165,250,.3);background:rgba(59,130,246,.08);}
+  .eligibility-status{display:inline-grid;gap:3px;min-width:126px;padding:3px;border-radius:7px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.025);text-align:left;line-height:1;}
+  .eligibility-status-line{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 6px;border-radius:4px;white-space:nowrap;}
+  .eligibility-status-line strong{font-size:9px;letter-spacing:.5px;}
+  .eligibility-status-line span{font-size:9px;color:rgba(255,255,255,.68);}
+  .eligibility-status-line.qualified{color:#86efac;background:rgba(34,197,94,.12);}
+  .eligibility-status-line.building{color:#bfdbfe;background:rgba(59,130,246,.1);}
+  .eligibility-status-line.risk{color:#fdba74;background:rgba(249,115,22,.16);}
+  .eligibility-status-line.locked{color:#fecaca;background:rgba(239,68,68,.18);}
+  .eligibility-status-line.clear{color:#cbd5e1;background:rgba(148,163,184,.09);}
   .eligibility-state{padding:38px 22px;text-align:center;color:rgba(255,255,255,.55);font-size:15px;line-height:1.45;}
   .eligibility-state strong{display:block;color:#dbeafe;font-size:18px;margin-bottom:5px;}
   .eligibility-reload-cta{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-top:18px;padding:0 18px;border:1px solid rgba(251,191,36,.55);border-radius:8px;background:#f59e0b;color:#172554;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;letter-spacing:.6px;cursor:pointer;}
@@ -377,7 +379,7 @@
     <label for="eligibilitySearch" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">Search player name</label>
     <div class="eligibility-search-wrap">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
-      <input id="eligibilitySearch" type="search" placeholder="Search a player…" autocomplete="off" inputmode="search" />
+      <input id="eligibilitySearch" name="player_lookup_query" type="search" role="searchbox" placeholder="Search a player…" autocomplete="off" inputmode="search" enterkeyhint="search" autocapitalize="none" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other" />
     </div>
     <div class="eligibility-grade-picker" role="group" aria-label="Finals grade">
       <button class="eligibility-grade-btn active" type="button" data-grade="MD3" aria-pressed="true">DIV 3 FINALS</button>
@@ -1691,23 +1693,33 @@ function gameCountElement(count){
 
 function eligibilityStatusElement(status){
   const pill=document.createElement('span');
-  pill.className=`eligibility-status ${status.state}`;
-  const label=document.createElement('strong');
-  const detail=document.createElement('span');
-  if(status.state==='locked'){
-    label.textContent='LOCKED OUT';
-    detail.textContent=`${status.higherGames} higher games`;
-  }else if(status.state==='risk'){
-    label.textContent='AT RISK';
-    detail.textContent='6 higher · 1 to lock';
-  }else if(status.state==='qualified'){
-    label.textContent='QUALIFIED';
-    detail.textContent=`${status.qualifyingGames} eligible games`;
+  pill.className='eligibility-status';
+
+  const statusLine=(className,labelText,detailText)=>{
+    const line=document.createElement('span');
+    line.className=`eligibility-status-line ${className}`;
+    const label=document.createElement('strong');
+    label.textContent=labelText;
+    const detail=document.createElement('span');
+    detail.textContent=detailText;
+    line.append(label,detail);
+    return line;
+  };
+
+  const hasQualified=status.qualifyingGames>=6;
+  pill.appendChild(statusLine(
+    hasQualified?'qualified':'building',
+    hasQualified?'QUALIFIED':`NEEDS ${status.gamesToQualify}`,
+    `${status.qualifyingGames}/6 eligible`
+  ));
+
+  if(status.higherGames>=7){
+    pill.appendChild(statusLine('locked','LOCKED OUT',`${status.higherGames} higher`));
+  }else if(status.higherGames===6){
+    pill.appendChild(statusLine('risk','AT RISK','6 higher · 1 left'));
   }else{
-    label.textContent=`NEEDS ${status.gamesToQualify}`;
-    detail.textContent=`${status.qualifyingGames}/6 eligible games`;
+    pill.appendChild(statusLine('clear','CAP CLEAR',`${status.higherGames}/7 higher`));
   }
-  pill.append(label,detail);
   return pill;
 }
 
