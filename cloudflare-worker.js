@@ -2,7 +2,9 @@ const DATA_KEY = "aflselector:data";
 const INDEX_KEY = "aflselector:index";
 const BOARD_KEY_PREFIX = "aflselector:board:";
 const PLAYHQ_API = "https://api.playhq.com/graphql";
-const ELIGIBILITY_CACHE_KEY = "aflselector:eligibility:2026";
+// Version the cache whenever eligibility maths changes so an older weekly
+// snapshot cannot survive a rules update.
+const ELIGIBILITY_CACHE_KEY = "aflselector:eligibility:2026:v2";
 const SYDNEY_TIME_ZONE = "Australia/Sydney";
 
 // UNSW-ES Bulldogs — 2026 men's teams, ordered from highest to lowest grade.
@@ -31,6 +33,10 @@ const FIXTURE_QUERY = `
         status { value }
         home { ... on DiscoverTeam { id } }
         away { ... on DiscoverTeam { id } }
+        result {
+          home { outcome { value } }
+          away { outcome { value } }
+        }
       }
     }
   }`;
@@ -107,6 +113,10 @@ function weekId(dateString, fallback) {
   return date.toISOString().slice(0, 10);
 }
 
+function teamForfeited(game, side) {
+  return game?.result?.[side]?.outcome?.value === "LOST_BY_FORFEIT";
+}
+
 async function mapWithConcurrency(items, concurrency, mapper) {
   const results = new Array(items.length);
   let cursor = 0;
@@ -169,6 +179,7 @@ function calculateFinalsEligibility(games) {
 }
 
 async function buildEligibilityPayload() {
+  let forfeitedGamesExcluded = 0;
   const fixtureSets = await Promise.all(ELIGIBILITY_TEAMS.map(async team => {
     const fixtureData = await playHqQuery(FIXTURE_QUERY, { teamId: team.teamId });
     const rounds = fixtureData?.discoverTeamFixture || [];
@@ -182,7 +193,17 @@ async function buildEligibilityPayload() {
         const side = game.home?.id === team.teamId
           ? "home"
           : game.away?.id === team.teamId ? "away" : null;
-        if (side) games.push({ gameId: game.id, side, team, fallbackWeek: `round-${roundIndex}` });
+        if (!side) return;
+
+        // A listed team sheet does not make an appearance eligible when UNSW
+        // was the forfeiting side. If the opponent forfeited, UNSW's submitted
+        // team sheet remains eligible and is processed normally.
+        if (teamForfeited(game, side)) {
+          forfeitedGamesExcluded += 1;
+          return;
+        }
+
+        games.push({ gameId: game.id, side, team, fallbackWeek: `round-${roundIndex}` });
       });
     });
     return games;
@@ -238,12 +259,15 @@ async function buildEligibilityPayload() {
       qualifyingTotal: Object.values(games).reduce((sum, count) => sum + count, 0),
       discounted
     };
-  }).sort((a, b) => a.name.localeCompare(b.name, "en-AU"));
+  })
+    .filter(player => (player.games.MD3 || 0) > 0 || (player.games.MD5 || 0) > 0)
+    .sort((a, b) => a.name.localeCompare(b.name, "en-AU"));
 
   return {
     club: "UNSW-ES Bulldogs",
     season: 2026,
     generatedAt: new Date().toISOString(),
+    forfeitedGamesExcluded,
     teams: ELIGIBILITY_TEAMS.map(({ shortName, name }) => ({ shortName, name })),
     players
   };

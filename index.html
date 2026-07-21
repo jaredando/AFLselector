@@ -180,7 +180,8 @@
   .eligibility-grade-btn.active{border-color:#60a5fa;background:rgba(59,130,246,.2);color:#dbeafe;box-shadow:inset 0 0 0 1px rgba(96,165,250,.15);}
   .eligibility-grade-btn:focus-visible,.eligibility-reload-cta:focus-visible,#eligibilityTipAction:focus-visible,#eligibilityTipClose:focus-visible{outline:2px solid #93c5fd;outline-offset:2px;}
   .eligibility-meta{min-height:16px;font-size:11px;color:rgba(255,255,255,.5);letter-spacing:.25px;display:flex;justify-content:space-between;gap:8px;}
-  .eligibility-table-wrap{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;touch-action:pan-x pan-y;border-top:1px solid rgba(255,255,255,.08);}
+  .eligibility-table-wrap{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;touch-action:pan-x pan-y;-webkit-overflow-scrolling:touch;border-top:1px solid rgba(255,255,255,.08);}
+  .eligibility-table-wrap *{touch-action:pan-x pan-y;}
   .eligibility-table{width:100%;min-width:570px;border-collapse:separate;border-spacing:0;font-size:13px;}
   .eligibility-table th{position:sticky;top:0;z-index:2;height:42px;background:#0a2147;color:rgba(255,255,255,.62);font-size:10px;letter-spacing:.8px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.12);padding:0 10px;text-align:center;white-space:nowrap;}
   .eligibility-table th:first-child,.eligibility-table td:first-child{position:sticky;left:0;text-align:left;min-width:142px;max-width:142px;}
@@ -317,7 +318,7 @@
     <div id="activeBoardName"></div>
     <div id="modeBadge"></div>
     <div class="top-actions">
-      <button id="eligibilityBtn" type="button" aria-haspopup="dialog" aria-controls="eligibilitySheet" aria-expanded="false">
+      <button id="eligibilityBtn" type="button" aria-label="Open finals eligibility" aria-haspopup="dialog" aria-controls="eligibilitySheet" aria-expanded="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path><path d="M8 11h6M11 8v6"></path></svg>
         <span>FINALS</span>
       </button>
@@ -437,7 +438,7 @@ let isNoUI = urlParams.has('noUI');
 
 const CLOUD_SYNC_URL='https://morning-sea-4cb2.jaredanderson0531.workers.dev';
 const ELIGIBILITY_URL=`${CLOUD_SYNC_URL}/eligibility`;
-const ELIGIBILITY_LOCAL_CACHE_KEY='afl_eligibility_weekly_2026';
+const ELIGIBILITY_LOCAL_CACHE_KEY='afl_eligibility_weekly_2026_v2';
 const ELIGIBILITY_TIP_KEY='afl_eligibility_tip_seen_v2';
 const CLOUD_SYNC_KEY=''; // Optional write key for the Worker. Leave blank if the Worker is public-write.
 const SAVE_DEBOUNCE_MS=1200;
@@ -1756,10 +1757,26 @@ function applyEligibilityData(data){
   renderEligibility();
 }
 
+function compareEligibilityRisk(a,b){
+  const aStatus=a.eligibility?.[selectedEligibilityGrade]||{};
+  const bStatus=b.eligibility?.[selectedEligibilityGrade]||{};
+  const priority={locked:3,risk:2,qualified:1,building:1,'no-games':1};
+  const stateDifference=(priority[bStatus.state]||0)-(priority[aStatus.state]||0);
+  if(stateDifference)return stateDifference;
+  const higherDifference=(bStatus.higherGames||0)-(aStatus.higherGames||0);
+  if(higherDifference)return higherDifference;
+  const qualifyingDifference=(bStatus.qualifyingGames||0)-(aStatus.qualifyingGames||0);
+  if(qualifyingDifference)return qualifyingDifference;
+  return a.name.localeCompare(b.name,'en-AU');
+}
+
 function renderEligibility(){
   if(!eligibilityData)return;
   const term=eligibilitySearch.value.trim().toLocaleLowerCase('en-AU');
-  const players=eligibilityData.players.filter(player=>player.name.toLocaleLowerCase('en-AU').includes(term));
+  const gradePlayers=eligibilityData.players.filter(player=>(player.games?.MD3||0)>0||(player.games?.MD5||0)>0);
+  const players=gradePlayers
+    .filter(player=>player.name.toLocaleLowerCase('en-AU').includes(term))
+    .sort(compareEligibilityRisk);
   eligibilityCount.textContent=term
     ? `${players.length} match${players.length===1?'':'es'}`
     : `${players.length} players`;
