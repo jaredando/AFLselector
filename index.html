@@ -140,6 +140,76 @@
   #menuBtn{background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#aaa;font-size:15px;width:32px;height:28px;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;}
   #activeBoardName{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'Bebas Neue',sans-serif;font-size:26px;color:rgba(255,255,255,0.35);letter-spacing:3px;pointer-events:none;white-space:nowrap;}
   #refreshBtn{background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#aaa;font-family:'Barlow Condensed',sans-serif;font-size:10px;padding:3px 7px;border-radius:4px;cursor:pointer;height:28px;}
+  .top-actions{display:flex;align-items:center;gap:6px;margin-left:auto;}
+  #eligibilityBtn{height:44px;min-width:44px;padding:0 10px;border-radius:6px;border:1px solid rgba(96,165,250,.42);background:rgba(7,31,75,.88);color:#bfdbfe;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;}
+  #eligibilityBtn svg{width:16px;height:16px;flex:0 0 auto;}
+  #eligibilityBtn:focus-visible,.eligibility-close:focus-visible,.eligibility-refresh:focus-visible,#eligibilitySearch:focus-visible{outline:2px solid #93c5fd;outline-offset:2px;}
+  #eligibilityBtn:active{background:rgba(30,64,175,.65);}
+  #eligibilityBtn.needs-attention{animation:eligibility-pulse 1.4s ease-in-out 6;}
+  @keyframes eligibility-pulse{0%,100%{border-color:rgba(96,165,250,.42);box-shadow:0 0 0 0 rgba(96,165,250,0)}50%{border-color:#fbbf24;box-shadow:0 0 0 7px rgba(251,191,36,.2),0 0 18px rgba(251,191,36,.28)}}
+  #eligibilityCoachTip{display:none;position:fixed;right:10px;top:62px;z-index:150;width:min(260px,calc(100vw - 20px));min-height:66px;border:1px solid rgba(251,191,36,.48);border-radius:10px;background:#102850;box-shadow:0 12px 30px rgba(0,0,0,.42);overflow:hidden;}
+  #eligibilityCoachTip.show{display:flex;}
+  #eligibilityCoachTip::before{content:'';position:absolute;right:73px;top:-6px;width:11px;height:11px;background:#102850;border-left:1px solid rgba(251,191,36,.48);border-top:1px solid rgba(251,191,36,.48);transform:rotate(45deg);}
+  #eligibilityTipAction{flex:1;min-width:0;border:0;background:transparent;color:#fff;text-align:left;padding:11px 8px 11px 14px;font-family:'Barlow Condensed',sans-serif;cursor:pointer;}
+  #eligibilityTipAction strong{display:block;font-size:16px;line-height:1.1;letter-spacing:.4px;color:#fef3c7;}
+  #eligibilityTipAction span{display:block;margin-top:4px;font-size:11px;line-height:1.25;color:rgba(255,255,255,.58);}
+  #eligibilityTipClose{width:44px;min-height:44px;align-self:flex-start;border:0;background:transparent;color:rgba(255,255,255,.6);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  #eligibilityTipClose svg{width:16px;height:16px;}
+
+  /* ── Finals eligibility lookup ── */
+  #eligibilityBackdrop{position:fixed;inset:0;z-index:699;background:rgba(2,8,23,.7);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity .22s ease;}
+  #eligibilityBackdrop.open{opacity:1;pointer-events:auto;}
+  #eligibilitySheet{position:fixed;left:0;right:0;bottom:0;z-index:700;height:min(82dvh,720px);background:#071a38;border-top:1px solid rgba(147,197,253,.32);border-radius:18px 18px 0 0;box-shadow:0 -18px 45px rgba(0,0,0,.45);transform:translateY(102%);transition:transform .28s cubic-bezier(.25,.46,.45,.94);display:flex;flex-direction:column;color:#fff;touch-action:auto;-webkit-user-select:text;user-select:text;}
+  #eligibilitySheet.open{transform:translateY(0);}
+  .eligibility-handle{width:42px;height:4px;border-radius:4px;background:rgba(255,255,255,.25);margin:8px auto 4px;flex:0 0 auto;}
+  .eligibility-header{display:flex;align-items:center;gap:10px;padding:8px 16px 12px;border-bottom:1px solid rgba(255,255,255,.09);}
+  .eligibility-heading{min-width:0;flex:1;}
+  .eligibility-title{font-family:'Bebas Neue',sans-serif;font-size:23px;line-height:1;letter-spacing:2px;color:#dbeafe;}
+  .eligibility-subtitle{font-size:11px;line-height:1.3;color:rgba(255,255,255,.52);margin-top:4px;letter-spacing:.25px;}
+  .eligibility-close,.eligibility-refresh{width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.13);background:rgba(255,255,255,.06);color:#dbeafe;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto;}
+  .eligibility-close svg,.eligibility-refresh svg{width:18px;height:18px;}
+  .eligibility-refresh:disabled{opacity:.35;cursor:default;}
+  .eligibility-controls{padding:12px 16px 10px;display:flex;flex-direction:column;gap:8px;}
+  .eligibility-search-wrap{position:relative;display:flex;align-items:center;}
+  .eligibility-search-wrap svg{position:absolute;left:13px;width:18px;height:18px;color:#93c5fd;pointer-events:none;}
+  #eligibilitySearch{width:100%;height:46px;border:1px solid rgba(147,197,253,.28);border-radius:10px;background:#0d2852;color:#fff;padding:0 42px;font-family:'Barlow Condensed',sans-serif;font-size:17px;outline:none;touch-action:auto;-webkit-user-select:text;user-select:text;-webkit-touch-callout:default;}
+  #eligibilitySearch::placeholder{color:rgba(255,255,255,.38);}
+  #eligibilitySearch:focus{border-color:#60a5fa;box-shadow:0 0 0 3px rgba(96,165,250,.13);}
+  .eligibility-grade-picker{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;}
+  .eligibility-grade-btn{height:38px;border:1px solid rgba(255,255,255,.12);border-radius:8px;background:rgba(255,255,255,.04);color:rgba(255,255,255,.58);font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;cursor:pointer;}
+  .eligibility-grade-btn.active{border-color:#60a5fa;background:rgba(59,130,246,.2);color:#dbeafe;box-shadow:inset 0 0 0 1px rgba(96,165,250,.15);}
+  .eligibility-grade-btn:focus-visible,.eligibility-reload-cta:focus-visible,#eligibilityTipAction:focus-visible,#eligibilityTipClose:focus-visible{outline:2px solid #93c5fd;outline-offset:2px;}
+  .eligibility-meta{min-height:16px;font-size:11px;color:rgba(255,255,255,.5);letter-spacing:.25px;display:flex;justify-content:space-between;gap:8px;}
+  .eligibility-table-wrap{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;touch-action:pan-x pan-y;border-top:1px solid rgba(255,255,255,.08);}
+  .eligibility-table{width:100%;min-width:570px;border-collapse:separate;border-spacing:0;font-size:13px;}
+  .eligibility-table th{position:sticky;top:0;z-index:2;height:42px;background:#0a2147;color:rgba(255,255,255,.62);font-size:10px;letter-spacing:.8px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.12);padding:0 10px;text-align:center;white-space:nowrap;}
+  .eligibility-table th:first-child,.eligibility-table td:first-child{position:sticky;left:0;text-align:left;min-width:142px;max-width:142px;}
+  .eligibility-table th:first-child{z-index:3;background:#0a2147;}
+  .eligibility-table td{height:47px;padding:0 10px;text-align:center;border-bottom:1px solid rgba(255,255,255,.07);background:#071a38;color:rgba(255,255,255,.72);font-variant-numeric:tabular-nums;}
+  .eligibility-table td:first-child{z-index:1;background:#071a38;color:#fff;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:8px 0 12px -12px #000;}
+  .eligibility-table tbody tr:nth-child(even) td{background:#091f43;}
+  .eligibility-table tbody tr:nth-child(even) td:first-child{background:#091f43;}
+  .game-count{display:inline-flex;min-width:28px;height:28px;border-radius:14px;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);}
+  .game-count.building{color:#93c5fd;border-color:rgba(96,165,250,.38);background:rgba(59,130,246,.11);font-weight:700;}
+  .game-count.close{color:#fde68a;border-color:rgba(234,179,8,.48);background:rgba(234,179,8,.12);font-weight:700;}
+  .game-count.risk{color:#fdba74;border-color:rgba(249,115,22,.58);background:rgba(249,115,22,.16);font-weight:800;}
+  .game-count.critical{color:#fecaca;border-color:rgba(239,68,68,.68);background:rgba(239,68,68,.18);font-weight:800;}
+  .eligibility-status{display:inline-flex;flex-direction:column;align-items:flex-start;min-width:104px;padding:5px 8px;border-radius:7px;border:1px solid rgba(255,255,255,.1);text-align:left;line-height:1.05;}
+  .eligibility-status strong{font-size:10px;letter-spacing:.55px;white-space:nowrap;}
+  .eligibility-status span{font-size:9px;margin-top:4px;color:rgba(255,255,255,.55);white-space:nowrap;}
+  .eligibility-status.qualified{color:#86efac;border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.1);}
+  .eligibility-status.risk{color:#fdba74;border-color:rgba(249,115,22,.58);background:rgba(249,115,22,.13);}
+  .eligibility-status.locked{color:#fecaca;border-color:rgba(239,68,68,.62);background:rgba(239,68,68,.15);}
+  .eligibility-status.building,.eligibility-status.no-games{color:#bfdbfe;border-color:rgba(96,165,250,.3);background:rgba(59,130,246,.08);}
+  .eligibility-state{padding:38px 22px;text-align:center;color:rgba(255,255,255,.55);font-size:15px;line-height:1.45;}
+  .eligibility-state strong{display:block;color:#dbeafe;font-size:18px;margin-bottom:5px;}
+  .eligibility-reload-cta{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin-top:18px;padding:0 18px;border:1px solid rgba(251,191,36,.55);border-radius:8px;background:#f59e0b;color:#172554;font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;letter-spacing:.6px;cursor:pointer;}
+  .eligibility-spinner{width:24px;height:24px;border:2px solid rgba(255,255,255,.16);border-top-color:#60a5fa;border-radius:50%;margin:0 auto 12px;animation:eligibility-spin .8s linear infinite;}
+  .eligibility-note{padding:9px 16px calc(9px + env(safe-area-inset-bottom));font-size:10px;line-height:1.35;color:rgba(255,255,255,.42);border-top:1px solid rgba(255,255,255,.08);background:#06152f;}
+  @keyframes eligibility-spin{to{transform:rotate(360deg)}}
+  @media(min-width:620px){#eligibilitySheet{left:50%;right:auto;width:min(600px,100vw);transform:translate(-50%,102%);border-radius:18px 18px 0 0;}#eligibilitySheet.open{transform:translate(-50%,0);}}
+  @media(max-width:390px){#eligibilityBtn span{display:none}#eligibilityBtn{padding:0;width:44px}.top-actions{gap:4px}}
+  @media(prefers-reduced-motion:reduce){#eligibilityBackdrop,#eligibilitySheet{transition:none}.eligibility-spinner{animation-duration:1.6s}#eligibilityBtn.needs-attention{animation:none;border-color:#fbbf24}}
 
   /* ── Sync & indicators ── */
   #syncStatus{position:absolute;bottom:10px;right:28px;z-index:100;font-size:9px;color:rgba(255,255,255,0.3);}
@@ -232,6 +302,8 @@
   body.no-ui #topBar,
   body.no-ui #boardIndicator,
   body.no-ui #syncStatus,
+  body.no-ui #eligibilityBtn,
+  body.no-ui #eligibilityCoachTip,
   body.no-ui .inv-arrows,
   body.no-ui .edge-indicator {
     display: none !important;
@@ -241,10 +313,16 @@
 <body>
 <div id="app">
   <div id="topBar">
-    <button id="menuBtn">&#9776;</button>
+    <button id="menuBtn" aria-label="Open boards menu">&#9776;</button>
     <div id="activeBoardName"></div>
     <div id="modeBadge"></div>
-    <button id="refreshBtn">↻ REFRESH</button>
+    <div class="top-actions">
+      <button id="eligibilityBtn" type="button" aria-haspopup="dialog" aria-controls="eligibilitySheet" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path><path d="M8 11h6M11 8v6"></path></svg>
+        <span>FINALS</span>
+      </button>
+      <button id="refreshBtn">↻ REFRESH</button>
+    </div>
   </div>
   <div id="boardTrackWrapper">
     <div id="boardTrack"></div>
@@ -273,7 +351,44 @@
   </div>
   <!-- Inventory panel -->
   <div id="inventoryPanel"><div id="inventoryLabel">EXTRA BENCH</div></div>
+  <div id="eligibilityCoachTip" role="status" aria-live="polite">
+    <button id="eligibilityTipAction" type="button"><strong>Check finals eligibility</strong><span>New weekly PlayHQ qualification check</span></button>
+    <button id="eligibilityTipClose" type="button" aria-label="Dismiss finals eligibility notice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></button>
+  </div>
 </div>
+
+<div id="eligibilityBackdrop"></div>
+<section id="eligibilitySheet" role="dialog" aria-modal="true" aria-labelledby="eligibilityTitle" aria-hidden="true">
+  <div class="eligibility-handle" aria-hidden="true"></div>
+  <div class="eligibility-header">
+    <div class="eligibility-heading">
+      <div class="eligibility-title" id="eligibilityTitle">FINALS CHECK</div>
+      <div class="eligibility-subtitle">UNSW-ES Bulldogs · qualifying games</div>
+    </div>
+    <button class="eligibility-refresh" id="eligibilityRefresh" type="button" aria-label="Refresh PlayHQ data">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5"></path><path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5"></path></svg>
+    </button>
+    <button class="eligibility-close" id="eligibilityClose" type="button" aria-label="Close finals check">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+    </button>
+  </div>
+  <div class="eligibility-controls">
+    <label for="eligibilitySearch" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">Search player name</label>
+    <div class="eligibility-search-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+      <input id="eligibilitySearch" type="search" placeholder="Search a player…" autocomplete="off" inputmode="search" />
+    </div>
+    <div class="eligibility-grade-picker" role="group" aria-label="Finals grade">
+      <button class="eligibility-grade-btn active" type="button" data-grade="MD3" aria-pressed="true">DIV 3 FINALS</button>
+      <button class="eligibility-grade-btn" type="button" data-grade="MD5" aria-pressed="false">DIV 5 FINALS</button>
+    </div>
+    <div class="eligibility-meta"><span id="eligibilityCount">Open to load players</span><span id="eligibilityUpdated"></span></div>
+  </div>
+  <div class="eligibility-table-wrap" id="eligibilityResults">
+    <div class="eligibility-state"><strong>Search finals games</strong>Counts are separate from names on the whiteboard.</div>
+  </div>
+  <div class="eligibility-note">Finals maths: 6 games in the selected grade or below to qualify; 7 games above locks a player out; 6 above is at risk. Same-week double-ups count once in the highest grade. Permits and league-approved exemptions still require manual confirmation.</div>
+</section>
 
 <!-- Password Overlay -->
 <div id="pwOverlay">
@@ -321,6 +436,9 @@ let isEdit = urlParams.has('edit');
 let isNoUI = urlParams.has('noUI');
 
 const CLOUD_SYNC_URL='https://morning-sea-4cb2.jaredanderson0531.workers.dev';
+const ELIGIBILITY_URL=`${CLOUD_SYNC_URL}/eligibility`;
+const ELIGIBILITY_LOCAL_CACHE_KEY='afl_eligibility_weekly_2026';
+const ELIGIBILITY_TIP_KEY='afl_eligibility_tip_seen_v2';
 const CLOUD_SYNC_KEY=''; // Optional write key for the Worker. Leave blank if the Worker is public-write.
 const SAVE_DEBOUNCE_MS=1200;
 const CLOUD_FAILURE_LIMIT=5;
@@ -371,6 +489,24 @@ const syncStatus=document.getElementById('syncStatus'),
       cloudBlocker=document.getElementById('cloudBlocker'),
       cloudBlockerMessage=document.getElementById('cloudBlockerMessage'),
       cloudRetryBtn=document.getElementById('cloudRetryBtn');
+
+const eligibilityBtn=document.getElementById('eligibilityBtn'),
+      eligibilityBackdrop=document.getElementById('eligibilityBackdrop'),
+      eligibilitySheet=document.getElementById('eligibilitySheet'),
+      eligibilityClose=document.getElementById('eligibilityClose'),
+      eligibilityRefresh=document.getElementById('eligibilityRefresh'),
+      eligibilitySearch=document.getElementById('eligibilitySearch'),
+      eligibilityResults=document.getElementById('eligibilityResults'),
+      eligibilityCount=document.getElementById('eligibilityCount'),
+      eligibilityUpdated=document.getElementById('eligibilityUpdated'),
+      eligibilityCoachTip=document.getElementById('eligibilityCoachTip'),
+      eligibilityTipAction=document.getElementById('eligibilityTipAction'),
+      eligibilityTipClose=document.getElementById('eligibilityTipClose');
+
+let eligibilityData=null;
+let eligibilityLoading=false;
+let eligibilityLastFocus=null;
+let selectedEligibilityGrade='MD3';
 
 const positions=[
   {id:'fpl',x:22,y:6,label:'FP'},{id:'ff',x:50,y:4,label:'FF'},{id:'fpr',x:78,y:6,label:'FP'},
@@ -1515,10 +1651,294 @@ createBoardBtn.addEventListener('click',()=>{
 newBoardConfirm.addEventListener('click',()=>{const n=newBoardInput.value.trim();if(n)createBoard(n);});
 newBoardInput.addEventListener('keydown',e=>{if(e.key==='Enter'){const n=newBoardInput.value.trim();if(n)createBoard(n);}});
 
+// ── FINALS ELIGIBILITY LOOKUP ──
+function setEligibilityState(title,message,options={}){
+  const {loading=false,actionLabel='',onAction=null}=options;
+  eligibilityResults.replaceChildren();
+  const state=document.createElement('div');
+  state.className='eligibility-state';
+  if(loading){
+    const spinner=document.createElement('div');
+    spinner.className='eligibility-spinner';
+    spinner.setAttribute('aria-hidden','true');
+    state.appendChild(spinner);
+  }
+  const strong=document.createElement('strong');
+  strong.textContent=title;
+  state.appendChild(strong,document.createTextNode(message));
+  if(actionLabel&&onAction){
+    const action=document.createElement('button');
+    action.type='button';
+    action.className='eligibility-reload-cta';
+    action.textContent=actionLabel;
+    action.addEventListener('click',onAction);
+    state.appendChild(document.createElement('br'),action);
+  }
+  eligibilityResults.appendChild(state);
+}
+
+function gameCountElement(count){
+  const value=document.createElement('span');
+  value.className='game-count';
+  if(count>=7)value.classList.add('critical');
+  else if(count===6)value.classList.add('risk');
+  else if(count>=4)value.classList.add('close');
+  else if(count>0)value.classList.add('building');
+  value.textContent=String(count);
+  return value;
+}
+
+function eligibilityStatusElement(status){
+  const pill=document.createElement('span');
+  pill.className=`eligibility-status ${status.state}`;
+  const label=document.createElement('strong');
+  const detail=document.createElement('span');
+  if(status.state==='locked'){
+    label.textContent='LOCKED OUT';
+    detail.textContent=`${status.higherGames} higher games`;
+  }else if(status.state==='risk'){
+    label.textContent='AT RISK';
+    detail.textContent='6 higher · 1 to lock';
+  }else if(status.state==='qualified'){
+    label.textContent='QUALIFIED';
+    detail.textContent=`${status.qualifyingGames} eligible games`;
+  }else{
+    label.textContent=`NEEDS ${status.gamesToQualify}`;
+    detail.textContent=`${status.qualifyingGames}/6 eligible games`;
+  }
+  pill.append(label,detail);
+  return pill;
+}
+
+function gradeFromCurrentBoard(){
+  const name=allData.boards[currentBoardId]?.name||'';
+  if(/div\s*5/i.test(name))return'MD5';
+  return'MD3';
+}
+
+function selectEligibilityGrade(grade){
+  selectedEligibilityGrade=grade;
+  document.querySelectorAll('.eligibility-grade-btn').forEach(button=>{
+    const active=button.dataset.grade===grade;
+    button.classList.toggle('active',active);
+    button.setAttribute('aria-pressed',String(active));
+  });
+  renderEligibility();
+}
+
+function eligibilityCacheIsFresh(data){
+  return !!data?.cacheUntil&&new Date(data.cacheUntil).getTime()>Date.now();
+}
+
+function readEligibilityLocalCache(){
+  try{
+    const cached=JSON.parse(localStorage.getItem(ELIGIBILITY_LOCAL_CACHE_KEY)||'null');
+    if(eligibilityCacheIsFresh(cached))return cached;
+    localStorage.removeItem(ELIGIBILITY_LOCAL_CACHE_KEY);
+  }catch(e){
+    localStorage.removeItem(ELIGIBILITY_LOCAL_CACHE_KEY);
+  }
+  return null;
+}
+
+function formatEligibilityCacheTime(dateString){
+  const date=new Date(dateString);
+  if(Number.isNaN(date.getTime()))return'';
+  return `Cached until ${date.toLocaleDateString('en-AU',{weekday:'short',timeZone:'Australia/Sydney'})} ${date.toLocaleTimeString('en-AU',{hour:'numeric',minute:'2-digit',timeZone:'Australia/Sydney'})}`;
+}
+
+function applyEligibilityData(data){
+  eligibilityData=data;
+  try{localStorage.setItem(ELIGIBILITY_LOCAL_CACHE_KEY,JSON.stringify(data));}catch(e){}
+  eligibilityUpdated.textContent=formatEligibilityCacheTime(data.cacheUntil);
+  eligibilityRefresh.disabled=eligibilityCacheIsFresh(data);
+  eligibilityRefresh.setAttribute('aria-label',eligibilityRefresh.disabled?'PlayHQ data is cached until Sunday evening':'Reload PlayHQ data');
+  renderEligibility();
+}
+
+function renderEligibility(){
+  if(!eligibilityData)return;
+  const term=eligibilitySearch.value.trim().toLocaleLowerCase('en-AU');
+  const players=eligibilityData.players.filter(player=>player.name.toLocaleLowerCase('en-AU').includes(term));
+  eligibilityCount.textContent=term
+    ? `${players.length} match${players.length===1?'':'es'}`
+    : `${players.length} players`;
+
+  if(!players.length){
+    setEligibilityState('No player found','Try a shorter first name or surname.');
+    return;
+  }
+
+  const table=document.createElement('table');
+  table.className='eligibility-table';
+  const thead=document.createElement('thead');
+  const headerRow=document.createElement('tr');
+  const playerHead=document.createElement('th');
+  playerHead.scope='col';
+  playerHead.textContent='Player';
+  headerRow.appendChild(playerHead);
+  const statusHead=document.createElement('th');
+  statusHead.scope='col';
+  statusHead.textContent=`${selectedEligibilityGrade.replace('MD','D')} Finals`;
+  headerRow.appendChild(statusHead);
+  eligibilityData.teams.forEach(team=>{
+    const th=document.createElement('th');
+    th.scope='col';
+    th.textContent=team.shortName;
+    th.title=team.name;
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+
+  const tbody=document.createElement('tbody');
+  players.forEach(player=>{
+    const row=document.createElement('tr');
+    const nameCell=document.createElement('td');
+    nameCell.textContent=player.name;
+    nameCell.title=player.discounted
+      ? `${player.discounted} same-week double-up appearance${player.discounted===1?'':'s'} excluded`
+      : player.name;
+    row.appendChild(nameCell);
+    const statusCell=document.createElement('td');
+    const status=player.eligibility?.[selectedEligibilityGrade];
+    if(status)statusCell.appendChild(eligibilityStatusElement(status));
+    else statusCell.textContent='—';
+    row.appendChild(statusCell);
+    eligibilityData.teams.forEach(team=>{
+      const cell=document.createElement('td');
+      cell.appendChild(gameCountElement(player.games[team.shortName]||0));
+      row.appendChild(cell);
+    });
+    tbody.appendChild(row);
+  });
+  table.append(thead,tbody);
+  eligibilityResults.replaceChildren(table);
+  eligibilityResults.scrollTop=0;
+}
+
+function showWeeklyRefreshRequired(message='The weekly cache has expired. One coach can reload PlayHQ, then everyone uses that snapshot until next Sunday evening.'){
+  eligibilityData=null;
+  eligibilityCount.textContent='Sunday refresh required';
+  eligibilityUpdated.textContent='';
+  eligibilityRefresh.disabled=false;
+  eligibilityRefresh.setAttribute('aria-label','Reload weekly PlayHQ data');
+  setEligibilityState('Weekly reload due',message,{
+    actionLabel:'RELOAD PLAYHQ',
+    onAction:()=>loadEligibility(true)
+  });
+}
+
+async function loadEligibility(force=false){
+  if(eligibilityLoading)return;
+  if(!force){
+    const localCache=readEligibilityLocalCache();
+    if(localCache){
+      applyEligibilityData(localCache);
+      return;
+    }
+  }
+  eligibilityLoading=true;
+  eligibilityRefresh.disabled=true;
+  eligibilityRefresh.setAttribute('aria-busy','true');
+  eligibilityCount.textContent='Loading PlayHQ…';
+  eligibilityUpdated.textContent='';
+  setEligibilityState('Checking team sheets',force?'Refreshing every senior grade from PlayHQ…':'Checking the shared Sunday snapshot…',{loading:true});
+  try{
+    const url=force?`${ELIGIBILITY_URL}?refresh=1`:ELIGIBILITY_URL;
+    const response=await fetch(url,{cache:'no-store'});
+    const data=await response.json().catch(()=>null);
+    if(response.status===409&&data?.refreshRequired){
+      showWeeklyRefreshRequired();
+      return;
+    }
+    if(!response.ok)throw new Error(data?.detail||data?.error||`HTTP ${response.status}`);
+    if(!Array.isArray(data?.players)||!Array.isArray(data?.teams))throw new Error('The Worker returned an unexpected response. Deploy the updated cloudflare-worker.js first.');
+    applyEligibilityData(data);
+  }catch(error){
+    console.error('Eligibility lookup failed:',error);
+    eligibilityCount.textContent='Could not load players';
+    setEligibilityState('PlayHQ unavailable',error.message||'Please try again shortly.',{
+      actionLabel:'TRY AGAIN',
+      onAction:()=>loadEligibility(force)
+    });
+  }finally{
+    eligibilityLoading=false;
+    eligibilityRefresh.disabled=eligibilityCacheIsFresh(eligibilityData);
+    eligibilityRefresh.removeAttribute('aria-busy');
+  }
+}
+
+function acknowledgeEligibilityTip(){
+  eligibilityCoachTip.classList.remove('show');
+  eligibilityBtn.classList.remove('needs-attention');
+  try{localStorage.setItem(ELIGIBILITY_TIP_KEY,'true');}catch(e){}
+}
+
+function showEligibilityTip(){
+  if(isNoUI)return;
+  let seen=false;
+  try{seen=localStorage.getItem(ELIGIBILITY_TIP_KEY)==='true';}catch(e){}
+  if(seen)return;
+  eligibilityCoachTip.classList.add('show');
+  eligibilityBtn.classList.add('needs-attention');
+}
+
+function openEligibility(){
+  acknowledgeEligibilityTip();
+  eligibilityLastFocus=document.activeElement;
+  eligibilityBackdrop.classList.add('open');
+  eligibilitySheet.classList.add('open');
+  eligibilitySheet.setAttribute('aria-hidden','false');
+  eligibilityBtn.setAttribute('aria-expanded','true');
+  document.getElementById('app').inert=true;
+  selectEligibilityGrade(gradeFromCurrentBoard());
+  setTimeout(()=>eligibilitySearch.focus(),80);
+  if(!eligibilityCacheIsFresh(eligibilityData))eligibilityData=null;
+  if(!eligibilityData)loadEligibility();else renderEligibility();
+}
+
+function closeEligibility(){
+  eligibilityBackdrop.classList.remove('open');
+  eligibilitySheet.classList.remove('open');
+  eligibilitySheet.setAttribute('aria-hidden','true');
+  eligibilityBtn.setAttribute('aria-expanded','false');
+  document.getElementById('app').inert=false;
+  if(eligibilityLastFocus?.focus)eligibilityLastFocus.focus();
+}
+
+eligibilityBtn.addEventListener('click',openEligibility);
+eligibilityClose.addEventListener('click',closeEligibility);
+eligibilityBackdrop.addEventListener('click',closeEligibility);
+eligibilityRefresh.addEventListener('click',()=>{
+  if(eligibilityCacheIsFresh(eligibilityData)){
+    eligibilityUpdated.textContent=formatEligibilityCacheTime(eligibilityData.cacheUntil);
+    return;
+  }
+  loadEligibility(true);
+});
+eligibilitySearch.addEventListener('input',renderEligibility);
+document.querySelectorAll('.eligibility-grade-btn').forEach(button=>button.addEventListener('click',()=>selectEligibilityGrade(button.dataset.grade)));
+eligibilityTipAction.addEventListener('click',openEligibility);
+eligibilityTipClose.addEventListener('click',acknowledgeEligibilityTip);
+eligibilitySheet.addEventListener('keydown',event=>{
+  if(event.key==='Escape'){
+    event.preventDefault();
+    closeEligibility();
+    return;
+  }
+  if(event.key!=='Tab')return;
+  const focusable=[...eligibilitySheet.querySelectorAll('button:not([disabled]),input:not([disabled])')];
+  if(!focusable.length)return;
+  const first=focusable[0],last=focusable[focusable.length-1];
+  if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+  else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+});
+
 // ── INIT ──
 function init() {
   if (isNoUI) document.body.classList.add('no-ui');
   updateBadge();
+  showEligibilityTip();
   if (!isDemo && !hasCloudConfig()) {
     loadFromCloud();
   } else if (needsCoachPassword()) {
