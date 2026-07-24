@@ -48,10 +48,12 @@
   .zone-label.field-zone{font-size:14px;letter-spacing:4px;}
   .zone-label.right-aligned{left:auto;right:5%;transform:none;text-align:right;}
   .divider{position:absolute;left:5%;width:90%;height:1px;background:rgba(255,255,255,0.1);z-index:2;pointer-events:none}
-  .fixture-overlay{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);z-index:2;width:72%;pointer-events:none;text-align:center;text-transform:uppercase;color:rgba(255,255,255,.24);text-shadow:0 2px 8px rgba(0,0,0,.38);}
-  .fixture-kicker{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;line-height:1;letter-spacing:2px;color:rgba(255,255,255,.17);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .fixture-overlay{position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);z-index:2;width:72%;pointer-events:none;text-align:center;text-transform:uppercase;color:rgba(255,255,255,.28);text-shadow:0 2px 8px rgba(0,0,0,.38);}
+  .fixture-overlay.initial-load{animation:fixture-flash .48s ease-out 1;}
+  .fixture-kicker{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;line-height:1;letter-spacing:2px;color:rgba(255,255,255,.2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .fixture-match{margin-top:5px;font-family:'Bebas Neue',sans-serif;font-size:clamp(17px,5vw,23px);line-height:1.05;letter-spacing:1.5px;white-space:normal;text-wrap:balance;}
-  .fixture-overlay.forfeit .fixture-match,.fixture-overlay.cancelled .fixture-match{color:rgba(254,202,202,.3);}
+  .fixture-overlay.forfeit .fixture-match,.fixture-overlay.cancelled .fixture-match{color:rgba(254,202,202,.34);}
+  @keyframes fixture-flash{0%{opacity:0;filter:brightness(1)}45%{opacity:1;filter:brightness(2.15)}100%{opacity:1;filter:brightness(1)}}
 
   /* ── Position slots & magnets ── */
   .pos-slot,.magnet{position:absolute;transform:translate(calc(-50% + 5px),-50%);z-index:3;width:70px;height:20px;border-radius:2px;}
@@ -218,7 +220,7 @@
   @keyframes eligibility-spin{to{transform:rotate(360deg)}}
   @media(min-width:620px){#eligibilitySheet{left:50%;right:auto;width:min(600px,100vw);transform:translate(-50%,102%);border-radius:18px 18px 0 0;}#eligibilitySheet.open{transform:translate(-50%,0);}}
   @media(max-width:390px){#eligibilityBtn span{display:none}#eligibilityBtn{padding:0;width:44px}.top-actions{gap:4px}}
-  @media(prefers-reduced-motion:reduce){#eligibilityBackdrop,#eligibilitySheet{transition:none}.eligibility-spinner{animation-duration:1.6s}#eligibilityBtn.needs-attention{animation:none;border-color:#fbbf24}}
+  @media(prefers-reduced-motion:reduce){#eligibilityBackdrop,#eligibilitySheet{transition:none}.eligibility-spinner{animation-duration:1.6s}#eligibilityBtn.needs-attention{animation:none;border-color:#fbbf24}.fixture-overlay.initial-load{animation:none}}
 
   /* ── Sync & indicators ── */
   #syncStatus{position:absolute;bottom:10px;right:28px;z-index:100;font-size:9px;color:rgba(255,255,255,0.3);}
@@ -520,6 +522,8 @@ let eligibilityLoading=false;
 let eligibilityLastFocus=null;
 let selectedEligibilityGrade='MD3';
 let boardFixtures={};
+let boardFixturesLoaded=false;
+let fixtureOverlayIntroPending=false;
 
 const positions=[
   {id:'fpl',x:22,y:6,label:'FP'},{id:'ff',x:50,y:4,label:'FF'},{id:'fpr',x:78,y:6,label:'FP'},
@@ -739,6 +743,8 @@ async function loadBoardFixtures(){
     const response=await fetch(`${BOARD_FIXTURES_URL}?_t=${Date.now()}`,{cache:'no-store'});
     const payload=await response.json().catch(()=>null);
     if(!response.ok||!payload?.fixtures)throw new Error(payload?.detail||payload?.error||`HTTP ${response.status}`);
+    fixtureOverlayIntroPending=!boardFixturesLoaded;
+    boardFixturesLoaded=true;
     boardFixtures=payload.fixtures;
     renderAllBoards();
   }catch(error){
@@ -1060,6 +1066,7 @@ function renderFixtureOverlay(boardId,groundEl){
 
   const overlay=document.createElement('div');
   overlay.className='fixture-overlay';
+  if(fixtureOverlayIntroPending&&boardId===currentBoardId)overlay.classList.add('initial-load');
   const kicker=document.createElement('div');
   kicker.className='fixture-kicker';
   kicker.textContent=`${fixture.round||'Upcoming'} · ${formatFixtureDate(fixture.date)}`;
@@ -1158,9 +1165,13 @@ function renderBoard(boardId,groundEl){
 }
 
 function renderAllBoards(){
-  [...boardTrack.children].forEach(groundEl=>{
+  const grounds=[...boardTrack.children];
+  grounds.forEach(groundEl=>{
     renderBoard(groundEl.dataset.boardId,groundEl);
   });
+  if(fixtureOverlayIntroPending&&grounds.some(groundEl=>groundEl.querySelector('.fixture-overlay.initial-load'))){
+    fixtureOverlayIntroPending=false;
+  }
 }
 
 // Re-render only the boards in `ids` (Set or array). Falls back to all boards.
