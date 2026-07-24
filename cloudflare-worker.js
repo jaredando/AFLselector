@@ -16,6 +16,10 @@ const ELIGIBILITY_TEAMS = [
   { shortName: "MD5", name: "Div 5", teamId: "389dd281", rank: 3 }
 ];
 
+const BOARD_FIXTURE_TEAMS = ELIGIBILITY_TEAMS.filter(team =>
+  team.shortName === "MD1" || team.shortName === "MD3" || team.shortName === "MD5"
+);
+
 const PLAYER_FRAGMENT = `
   ... on DiscoverParticipant { id profile { firstName lastName } }
   ... on DiscoverRegularFillInPlayer { id name }
@@ -48,6 +52,25 @@ const GAME_STATS_QUERY = `
       statistics {
         home { players { player { ${PLAYER_FRAGMENT} } } }
         away { players { player { ${PLAYER_FRAGMENT} } } }
+      }
+    }
+  }`;
+
+const UPCOMING_FIXTURE_QUERY = `
+  query TeamFixture($teamId: ID!) {
+    discoverTeamFixture(teamID: $teamId) {
+      name
+      games {
+        id
+        date
+        status { value }
+        allocation { time timezone }
+        home { __typename ... on DiscoverTeam { id name } }
+        away { __typename ... on DiscoverTeam { id name } }
+        result {
+          home { outcome { value } }
+          away { outcome { value } }
+        }
       }
     }
   }`;
@@ -115,6 +138,88 @@ function weekId(dateString, fallback) {
 
 function teamForfeited(game, side) {
   return game?.result?.[side]?.outcome?.value === "LOST_BY_FORFEIT";
+}
+
+function dateKeyInTimeZone(date, timeZone) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-AU", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date).map(part => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function cleanOpponentName(name) {
+  if (!name) return "Opponent TBC";
+  return name
+    .replace(/\s+M(?:PD|D\d+)$/i, "")
+    .replace(/\s+(?:Men'?s\s+)?Division\s+\d+$/i, "")
+    .trim();
+}
+
+function forfeitState(game, side) {
+  const outcome = game?.result?.[side]?.outcome?.value;
+  if (outcome === "LOST_BY_FORFEIT") return "club";
+  if (outcome === "WON_BY_FORFEIT") return "opponent";
+  return null;
+}
+
+async function buildBoardFixtures(now = new Date()) {
+  const today = dateKeyInTimeZone(now, SYDNEY_TIME_ZONE);
+  const fixtureEntries = await Promise.all(BOARD_FIXTURE_TEAMS.map(async team => {
+    const fixtureData = await playHqQuery(UPCOMING_FIXTURE_QUERY, { teamId: team.teamId });
+    const candidates = [];
+
+    (fixtureData?.discoverTeamFixture || []).forEach((round, roundIndex) => {
+      (round.games || []).forEach(game => {
+        const side = game.home?.id === team.teamId
+          ? "home"
+          : game.away?.id === team.teamId ? "away" : null;
+        if (!side || !game.date || game.date < today) return;
+        const opponent = side === "home" ? game.away : game.home;
+        candidates.push({ game, side, opponent, roundName: round.name || "Upcoming", roundIndex });
+      });
+    });
+
+    candidates.sort((a, b) =>
+      a.game.date.localeCompare(b.game.date) ||
+      (a.game.allocation?.time || "23:59:59").localeCompare(b.game.allocation?.time || "23:59:59") ||
+      a.roundIndex - b.roundIndex
+    );
+
+    const next = candidates[0];
+    if (!next) return [team.shortName, null];
+    return [team.shortName, {
+      gameId: next.game.id,
+      round: next.roundName,
+      date: next.game.date,
+      time: next.game.allocation?.time || null,
+      timezone: next.game.allocation?.timezone || SYDNEY_TIME_ZONE,
+      side: next.side,
+      opponent: cleanOpponentName(next.opponent?.name),
+      status: next.game.status?.value || null,
+      forfeit: forfeitState(next.game, next.side)
+    }];
+  }));
+
+  return {
+    club: "UNSW-ES Bulldogs",
+    generatedAt: now.toISOString(),
+    effectiveDate: today,
+    fixtures: Object.fromEntries(fixtureEntries)
+  };
+}
+
+async function handleBoardFixtures(request, env) {
+  if (request.method !== "GET") {
+    return jsonResponse({ error: "Method not allowed" }, env, 405);
+  }
+  try {
+    return jsonResponse(await buildBoardFixtures(), env);
+  } catch (error) {
+    return jsonResponse({ error: "Could not load PlayHQ fixtures", detail: error.message }, env, 502);
+  }
 }
 
 async function mapWithConcurrency(items, concurrency, mapper) {
@@ -437,6 +542,9 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/eligibility") {
       return handleEligibility(request, env);
+    }
+    if (url.pathname === "/fixtures") {
+      return handleBoardFixtures(request, env);
     }
 
     if (!hasKvBinding(env)) {

@@ -48,6 +48,10 @@
   .zone-label.field-zone{font-size:14px;letter-spacing:4px;}
   .zone-label.right-aligned{left:auto;right:5%;transform:none;text-align:right;}
   .divider{position:absolute;left:5%;width:90%;height:1px;background:rgba(255,255,255,0.1);z-index:2;pointer-events:none}
+  .fixture-overlay{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);z-index:2;width:72%;pointer-events:none;text-align:center;text-transform:uppercase;color:rgba(255,255,255,.24);text-shadow:0 2px 8px rgba(0,0,0,.38);}
+  .fixture-kicker{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;line-height:1;letter-spacing:2px;color:rgba(255,255,255,.17);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .fixture-match{margin-top:5px;font-family:'Bebas Neue',sans-serif;font-size:clamp(17px,5vw,23px);line-height:1.05;letter-spacing:1.5px;white-space:normal;text-wrap:balance;}
+  .fixture-overlay.forfeit .fixture-match,.fixture-overlay.cancelled .fixture-match{color:rgba(254,202,202,.3);}
 
   /* ── Position slots & magnets ── */
   .pos-slot,.magnet{position:absolute;transform:translate(calc(-50% + 5px),-50%);z-index:3;width:70px;height:20px;border-radius:2px;}
@@ -442,6 +446,7 @@ let isNoUI = urlParams.has('noUI');
 
 const CLOUD_SYNC_URL='https://morning-sea-4cb2.jaredanderson0531.workers.dev';
 const ELIGIBILITY_URL=`${CLOUD_SYNC_URL}/eligibility`;
+const BOARD_FIXTURES_URL=`${CLOUD_SYNC_URL}/fixtures`;
 const ELIGIBILITY_LOCAL_CACHE_KEY='afl_eligibility_weekly_2026_v2';
 const ELIGIBILITY_TIP_KEY='afl_eligibility_tip_seen_v2';
 const CLOUD_SYNC_KEY=''; // Optional write key for the Worker. Leave blank if the Worker is public-write.
@@ -514,6 +519,7 @@ let eligibilityData=null;
 let eligibilityLoading=false;
 let eligibilityLastFocus=null;
 let selectedEligibilityGrade='MD3';
+let boardFixtures={};
 
 const positions=[
   {id:'fpl',x:22,y:6,label:'FP'},{id:'ff',x:50,y:4,label:'FF'},{id:'fpr',x:78,y:6,label:'FP'},
@@ -667,6 +673,30 @@ function limitGraphemes(str,max){
   return[...str].slice(0,max).join('');
 }
 
+function fixtureGradeForBoardName(name){
+  const normalized=String(name||'').trim();
+  if(/\bdiv(?:ision)?\s*1\b/i.test(normalized))return'MD1';
+  if(/\bdiv(?:ision)?\s*3\b/i.test(normalized))return'MD3';
+  if(/\bdiv(?:ision)?\s*5\b/i.test(normalized))return'MD5';
+  return null;
+}
+
+function formatFixtureDate(dateString){
+  const parts=String(dateString||'').split('-').map(Number);
+  if(parts.length!==3||parts.some(part=>!Number.isFinite(part)))return'DATE TBC';
+  const date=new Date(Date.UTC(parts[0],parts[1]-1,parts[2],12));
+  return new Intl.DateTimeFormat('en-AU',{
+    timeZone:'Australia/Sydney',weekday:'short',day:'numeric',month:'short'
+  }).format(date);
+}
+
+function formatFixtureTime(timeString){
+  const [hourText='0',minute='00']=String(timeString||'').split(':');
+  const hour=Number(hourText);
+  if(!Number.isFinite(hour)||!timeString)return'TIME TBC';
+  return `${hour%12||12}:${minute} ${hour>=12?'PM':'AM'}`;
+}
+
 // ── DATA SYNC ──
 function cloudError(message,status){
   const err=new Error(message);
@@ -702,6 +732,18 @@ async function readCloudData(){
   const res=await fetch(`${workerUrl}?_t=${Date.now()}`,{cache:'no-store'});
   if(!res.ok)throw cloudError('Cloudflare read failed',res.status);
   return unwrapCloudData(await res.json());
+}
+
+async function loadBoardFixtures(){
+  try{
+    const response=await fetch(`${BOARD_FIXTURES_URL}?_t=${Date.now()}`,{cache:'no-store'});
+    const payload=await response.json().catch(()=>null);
+    if(!response.ok||!payload?.fixtures)throw new Error(payload?.detail||payload?.error||`HTTP ${response.status}`);
+    boardFixtures=payload.fixtures;
+    renderAllBoards();
+  }catch(error){
+    console.warn('PlayHQ fixture overlay unavailable:',error);
+  }
 }
 
 async function writeCloudData(data,keepalive=false,boardIds=null){
@@ -1011,10 +1053,44 @@ function drawOval(groundEl){
   const emgLbl=document.createElement('div');emgLbl.className='zone-label right-aligned';emgLbl.style.top='76.5%';emgLbl.textContent='EMERGENCY';groundEl.appendChild(emgLbl);
 }
 
+function renderFixtureOverlay(boardId,groundEl){
+  const grade=fixtureGradeForBoardName(allData.boards[boardId]?.name);
+  const fixture=grade?boardFixtures[grade]:null;
+  if(!fixture)return;
+
+  const overlay=document.createElement('div');
+  overlay.className='fixture-overlay';
+  const kicker=document.createElement('div');
+  kicker.className='fixture-kicker';
+  kicker.textContent=`${fixture.round||'Upcoming'} · ${formatFixtureDate(fixture.date)}`;
+  const match=document.createElement('div');
+  match.className='fixture-match';
+  const opponent=fixture.opponent||'Opponent TBC';
+  const opponentPrefix=fixture.side==='away'?'@':'vs';
+
+  if(fixture.forfeit==='club'){
+    overlay.classList.add('forfeit');
+    match.textContent=`UNSW-ES FORFEIT · ${opponentPrefix} ${opponent}`;
+  }else if(fixture.forfeit==='opponent'){
+    overlay.classList.add('forfeit');
+    match.textContent=`OPPONENT FORFEIT · ${opponentPrefix} ${opponent}`;
+  }else if(/CANCEL|ABANDON/i.test(fixture.status||'')){
+    overlay.classList.add('cancelled');
+    match.textContent=`MATCH CANCELLED · ${opponentPrefix} ${opponent}`;
+  }else{
+    match.textContent=`${formatFixtureTime(fixture.time)} · ${opponentPrefix} ${opponent}`;
+  }
+
+  overlay.setAttribute('role','note');
+  overlay.setAttribute('aria-label',`${kicker.textContent}. ${match.textContent}`);
+  overlay.append(kicker,match);
+  groundEl.appendChild(overlay);
+}
+
 function renderBoard(boardId,groundEl){
   if(!groundEl||!allData.boards[boardId])return;
   groundEl.dataset.boardId=boardId;
-  groundEl.querySelectorAll('.zone-label,.pos-slot,.magnet,.divider,.bg,.inv-arrows').forEach(e=>e.remove());
+  groundEl.querySelectorAll('.zone-label,.fixture-overlay,.pos-slot,.magnet,.divider,.bg,.inv-arrows').forEach(e=>e.remove());
   drawOval(groundEl);
   zones.forEach(z=>{
     const el=document.createElement('div');
@@ -1023,6 +1099,7 @@ function renderBoard(boardId,groundEl){
     el.textContent=z.label;
     groundEl.appendChild(el);
   });
+  renderFixtureOverlay(boardId,groundEl);
   const boardRoster=allData.boards[boardId]?.roster||{};
   positions.forEach(p=>{
     const data=boardRoster[p.id],name=typeof data==='object'?data.name:data,badge=typeof data==='object'?data.badge:'';
@@ -1575,7 +1652,10 @@ editCancel.addEventListener('click', e => {
   closeEdit();
 });
 editInput.addEventListener('keydown',e=>{if(e.key==='Enter')editSave.click();});
-refreshBtn.addEventListener('click',loadFromCloud);
+refreshBtn.addEventListener('click',()=>{
+  loadFromCloud();
+  loadBoardFixtures();
+});
 cloudRetryBtn.addEventListener('click',loadFromCloud);
 window.addEventListener('resize',()=>{rebuildTrack(); renderAllBoards();});
 
@@ -1997,6 +2077,7 @@ function init() {
   if (isNoUI) document.body.classList.add('no-ui');
   updateBadge();
   showEligibilityTip();
+  loadBoardFixtures();
   if (!isDemo && !hasCloudConfig()) {
     removeCoachPasswordField();
     loadFromCloud();
