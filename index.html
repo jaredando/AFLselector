@@ -702,8 +702,10 @@ function duplicateNameKey(name){
   return String(name??'').toLocaleLowerCase('en-AU').replace(/[^a-z0-9]/g,'');
 }
 
-// Split into a first name and whatever follows it, so "Tristan M" can be told
-// apart from "Tristan B" while still collapsing to the same key as "TristanM".
+// Split into a first name and a surname, so "Tristan M" can be told apart from
+// "Tristan B" while still collapsing to the same key as "TristanM". Only the
+// last token counts as the surname, so a middle name or initial does not stop
+// "Tristan J Murphy" matching "Tristan Murphy".
 function parseDisplayName(name){
   const cleaned=String(name??'')
     .toLocaleLowerCase('en-AU')
@@ -712,7 +714,11 @@ function parseDisplayName(name){
     .replace(/\s+/g,' ');
   if(!cleaned)return null;
   const tokens=cleaned.split(' ');
-  return {key:tokens.join(''),first:tokens[0],rest:tokens.slice(1).join('')};
+  return {
+    key:tokens.join(''),
+    first:tokens[0],
+    surname:tokens.length>1?tokens[tokens.length-1]:''
+  };
 }
 
 // Shortest truncation treated as a nickname. Four keeps "Trist"/"Tristan" and
@@ -738,7 +744,18 @@ function surnamesLikelySame(a,b){
 }
 
 function likelySamePlayer(a,b){
-  return firstNamesLikelySame(a.first,b.first)&&surnamesLikelySame(a.rest,b.rest);
+  if(!surnamesLikelySame(a.surname,b.surname))return false;
+  if(a.first===b.first)return true;
+  // Beyond this point the first names only resemble each other, so a nickname
+  // is being guessed at. That is only safe when the surnames actively agree:
+  // both absent ("Trist"/"Tristan"), or both present and identical ("Matt
+  // Murphy"/"Matty Murphy"). A surname on one side that the other lacks is not
+  // evidence they are the same player, which is why "Matty" is left alone
+  // beside "Matt Murphy".
+  const bothWithoutSurname=!a.surname&&!b.surname;
+  const surnamesAgree=Boolean(a.surname)&&a.surname===b.surname;
+  if(!bothWithoutSurname&&!surnamesAgree)return false;
+  return firstNamesLikelySame(a.first,b.first);
 }
 
 // Scoped to a single board: the field roster plus its extra bench. Names on
