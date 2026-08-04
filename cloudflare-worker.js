@@ -75,6 +75,42 @@ const UPCOMING_FIXTURE_QUERY = `
     }
   }`;
 
+// The venue selection could not be verified against PlayHQ's schema, and
+// playHqQuery throws on any query error, so the venue is fetched in its own
+// isolated request per away game. A shape that does not match this tenant
+// leaves the venue null rather than failing the whole /fixtures response.
+// The first shape that works is remembered for the life of the isolate.
+const VENUE_QUERIES = [
+  `query GameVenue($gameId: ID!) {
+    discoverGame(gameID: $gameId) { allocation { court { name venue { name } } } }
+  }`,
+  `query GameVenue($gameId: ID!) {
+    discoverGame(gameID: $gameId) { allocation { venue { name } } }
+  }`,
+  `query GameVenue($gameId: ID!) {
+    discoverGame(gameID: $gameId) { venue { name } }
+  }`
+];
+let workingVenueQuery = null;
+
+async function fetchVenueName(gameId) {
+  const attempts = workingVenueQuery ? [workingVenueQuery] : VENUE_QUERIES;
+  for (const query of attempts) {
+    try {
+      const game = (await playHqQuery(query, { gameId }))?.discoverGame;
+      const allocation = game?.allocation;
+      const venue = allocation?.court?.venue || allocation?.venue || game?.venue;
+      if (!venue?.name) continue;
+      workingVenueQuery = query;
+      const court = allocation?.court?.name;
+      return court && court !== venue.name ? `${venue.name} · ${court}` : venue.name;
+    } catch (error) {
+      // Wrong shape for this tenant, or the game has no allocation yet.
+    }
+  }
+  return null;
+}
+
 function corsHeaders(env) {
   return {
     "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN || "*",
@@ -234,6 +270,7 @@ async function buildBoardFixtures(now = new Date()) {
         side: null,
         bye: true,
         opponent: null,
+        venue: null,
         status: null,
         forfeit: null,
         nextRound: next.roundName,
@@ -249,6 +286,8 @@ async function buildBoardFixtures(now = new Date()) {
       side: next.side,
       bye: false,
       opponent: cleanOpponentName(next.opponent?.name),
+      // Only away games need directions; home games are at the club's ground.
+      venue: next.side === "away" ? await fetchVenueName(next.game.id) : null,
       status: next.game.status?.value || null,
       forfeit: forfeitState(next.game, next.side),
       nextRound: null,
