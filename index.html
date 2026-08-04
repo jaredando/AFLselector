@@ -1863,9 +1863,15 @@ document.addEventListener('pointerdown',e=>{
 // Painted from board data onto a canvas rather than screenshotting the DOM.
 // That keeps the output cropped to the ground itself and free of coach mode,
 // the top bar and the board dots by construction, with no capture library.
-const SHOT_WIDTH=1080;
-const SHOT_PAD=30;
-const SHOT_HEADER=104;
+// Laid out to a fixed poster frame rather than traced from the live board,
+// which is what produced a stretched oval running off both edges. 4:5 is the
+// tallest portrait Instagram will show uncropped.
+const SHOT_W=1080,SHOT_H=1350;
+const SHOT_MARGIN=44;
+const SHOT_HEADER_H=196;
+const SHOT_BENCH_H=252;
+const SHOT_FOOTER_H=56;
+const SHOT_BENCH_COLS=[10,30,50,70,90];
 
 function shotFont(ctx,font,spacing){
   ctx.font=font;
@@ -1885,6 +1891,45 @@ function shotRoundRect(ctx,x,y,w,h,r){
   if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);
   else ctx.rect(x,y,w,h);
   return ctx;
+}
+
+// One uniform tag shape everywhere, with the badge sitting on the left edge —
+// ragged widths and floating badges were what made the old export look untidy.
+function shotTag(ctx,cx,cy,w,h,opts){
+  const left=cx-w/2;
+  const tone=opts.tone;
+  if(tone){
+    ctx.save();
+    ctx.shadowColor=tone.glow;
+    ctx.shadowBlur=20;
+  }
+  ctx.fillStyle=tone?tone.fill:MAGNET_FILL;
+  shotRoundRect(ctx,left,cy-h/2,w,h,5);
+  ctx.fill();
+  if(tone)ctx.restore();
+
+  let textLeft=left;
+  if(opts.badge){
+    const r=h/2+3;
+    ctx.beginPath();
+    ctx.arc(left,cy,r,0,Math.PI*2);
+    ctx.fillStyle='#6786b8';
+    ctx.fill();
+    ctx.strokeStyle='#fff';
+    ctx.lineWidth=2.5;
+    ctx.stroke();
+    ctx.fillStyle=opts.badgeColor||'#fff';
+    ctx.textAlign='center';
+    shotFont(ctx,`700 ${graphemeCount(opts.badge)===1?23:16}px 'Barlow Condensed', sans-serif`,'0px');
+    ctx.fillText(opts.badge,left,cy);
+    textLeft=left+r;
+  }
+
+  ctx.fillStyle=MAGNET_TEXT;
+  ctx.textAlign='center';
+  shotFont(ctx,`700 ${opts.size}px 'Barlow Condensed', sans-serif`,'.4px');
+  const right=left+w;
+  ctx.fillText(shotFit(ctx,opts.name,right-textLeft-18),(textLeft+right)/2,cy);
 }
 
 // Resolved before drawing so the canvas is never tainted: an image fetched
@@ -1919,154 +1964,137 @@ function shotFixtureLines(boardId){
 
 async function buildBoardImage(boardId){
   const board=allData.boards[boardId];
-  const groundEl=getBoardElement(boardId);
-  const lw=groundEl.clientWidth,lh=groundEl.clientHeight;
-  if(!board||!lw||!lh)throw new Error('Board not ready');
+  if(!board)throw new Error('Board not ready');
 
-  const scale=(SHOT_WIDTH-SHOT_PAD*2)/lw;
   const canvas=document.createElement('canvas');
-  canvas.width=SHOT_WIDTH;
-  canvas.height=Math.round(SHOT_HEADER+lh*scale+SHOT_PAD);
+  canvas.width=SHOT_W;canvas.height=SHOT_H;
   const ctx=canvas.getContext('2d');
-  // Board-local pixels to canvas pixels.
-  const X=lx=>SHOT_PAD+lx*scale;
-  const Y=ly=>SHOT_HEADER+ly*scale;
-  const S=n=>n*scale;
+  const contentW=SHOT_W-SHOT_MARGIN*2;
+  const fieldTop=SHOT_HEADER_H;
+  const fieldH=SHOT_H-SHOT_HEADER_H-SHOT_BENCH_H-SHOT_FOOTER_H;
+  // The board's own coordinates are percentages, with the field ending at the
+  // 76% divider and the bench living below it. Only the field half is mapped
+  // onto the oval; the bench is laid out as its own grid.
+  const fieldX=px=>SHOT_MARGIN+(px/100)*contentW;
+  const fieldY=py=>fieldTop+(py/76)*fieldH;
 
-  ctx.fillStyle='#051b43';
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-
-  ctx.textAlign='left';
-  ctx.textBaseline='alphabetic';
-  ctx.fillStyle='#ffffff';
-  shotFont(ctx,"400 40px 'Bebas Neue', sans-serif",'3px');
-  ctx.fillText(shotFit(ctx,(board.name||'BOARD').toUpperCase(),SHOT_WIDTH-SHOT_PAD*2),SHOT_PAD,58);
-
-  const fixtureLines=shotFixtureLines(boardId);
-  if(fixtureLines){
-    ctx.fillStyle='rgba(255,255,255,.5)';
-    shotFont(ctx,"700 18px 'Barlow Condensed', sans-serif",'2px');
-    // The ground name / next round is drawn on the board below, so it is left
-    // out here rather than pushing the header into an ellipsis.
-    const header=[fixtureLines.kicker,fixtureLines.match]
-      .filter(Boolean).join('  ·  ').toUpperCase();
-    ctx.fillText(shotFit(ctx,header,SHOT_WIDTH-SHOT_PAD*2),SHOT_PAD,84);
-  }
-
-  // Ground, mirroring drawOval's proportions.
-  const cx=lw*0.5,cy=lh*0.38,rx=lw*0.46,ry=lh*0.37,sq=lw*0.42;
-  const line='rgba(255,255,255,0.3)';
-  ctx.strokeStyle=line;
-  ctx.lineWidth=S(3);
-  ctx.beginPath();
-  ctx.ellipse(X(cx),Y(cy),S(rx),S(ry),0,0,Math.PI*2);
-  ctx.stroke();
-
-  const goalH=22,behindH=14,postGap=12;
-  [[-1.5,behindH],[-0.5,goalH],[0.5,goalH],[1.5,behindH]].forEach(([mult,len])=>{
-    ctx.beginPath();
-    ctx.moveTo(X(cx+postGap*mult),Y(cy-ry));
-    ctx.lineTo(X(cx+postGap*mult),Y(cy-ry+len));
-    ctx.moveTo(X(cx+postGap*mult),Y(cy+ry));
-    ctx.lineTo(X(cx+postGap*mult),Y(cy+ry-len));
-    ctx.stroke();
-  });
-  ctx.strokeRect(X(cx-sq/2),Y(cy-sq/2),S(sq),S(sq));
+  ctx.fillStyle='#061b45';
+  ctx.fillRect(0,0,SHOT_W,SHOT_H);
+  const glow=ctx.createRadialGradient(SHOT_W/2,fieldTop+fieldH*0.45,60,SHOT_W/2,fieldTop+fieldH*0.45,SHOT_W*0.78);
+  glow.addColorStop(0,'rgba(37,84,166,.34)');
+  glow.addColorStop(1,'rgba(6,27,69,0)');
+  ctx.fillStyle=glow;
+  ctx.fillRect(0,0,SHOT_W,SHOT_H);
 
   const logo=await loadClubLogo();
-  if(logo)ctx.drawImage(logo,X(cx-36),Y(cy-36),S(72),S(72));
+  const fixtureLines=shotFixtureLines(boardId);
 
-  // Divider and bench captions.
-  ctx.fillStyle='rgba(255,255,255,0.1)';
-  ctx.fillRect(X(lw*0.05),Y(lh*0.76),S(lw*0.9),Math.max(1,S(1)));
-
-  ctx.textBaseline='top';
-  ctx.fillStyle='rgba(255,255,255,0.2)';
-  shotFont(ctx,"400 11px 'Bebas Neue', sans-serif",'3px');
-  ctx.textAlign='center';
-  ctx.fillText('INTERCHANGE',X(lw*0.5),Y(lh*0.765));
-  ctx.textAlign='right';
-  ctx.fillText('EMERGENCY',X(lw*0.95),Y(lh*0.765));
-
-  ctx.textAlign='center';
-  shotFont(ctx,"400 14px 'Bebas Neue', sans-serif",'4px');
-  zones.forEach(z=>ctx.fillText(z.label,X(lw*0.5),Y(lh*(z.y/100))));
-
+  // ── Header ──
+  ctx.textBaseline='alphabetic';
+  ctx.textAlign='left';
+  let titleX=SHOT_MARGIN;
+  if(logo){
+    ctx.drawImage(logo,SHOT_MARGIN,30,96,96);
+    titleX=SHOT_MARGIN+116;
+  }
+  ctx.fillStyle='#ffffff';
+  shotFont(ctx,"400 66px 'Bebas Neue', sans-serif",'3px');
+  ctx.fillText(shotFit(ctx,(board.name||'BOARD').toUpperCase(),contentW-(titleX-SHOT_MARGIN)),titleX,86);
   if(fixtureLines){
-    ctx.textAlign='center';
-    ctx.fillStyle='rgba(255,255,255,.2)';
-    shotFont(ctx,"700 11px 'Barlow Condensed', sans-serif",'2px');
-    ctx.fillText(fixtureLines.kicker.toUpperCase(),X(lw*0.5),Y(lh*0.54));
-    ctx.fillStyle=fixtureLines.match==='BYE'?'rgba(191,219,254,.3)':'rgba(255,255,255,.28)';
-    shotFont(ctx,"400 21px 'Bebas Neue', sans-serif",fixtureLines.match==='BYE'?'6px':'1.5px');
-    ctx.fillText(fixtureLines.match.toUpperCase(),X(lw*0.5),Y(lh*0.54)+S(16));
-    // Ground name on an away game, or the next round when this week is a bye —
-    // the same third line the board itself shows under the match.
+    ctx.fillStyle='rgba(191,219,254,.82)';
+    shotFont(ctx,"700 23px 'Barlow Condensed', sans-serif",'2.2px');
+    const line=[fixtureLines.kicker,fixtureLines.match].filter(Boolean).join('  ·  ').toUpperCase();
+    ctx.fillText(shotFit(ctx,line,contentW-(titleX-SHOT_MARGIN)),titleX,122);
     if(fixtureLines.sub){
-      ctx.fillStyle='rgba(255,255,255,.2)';
-      shotFont(ctx,"700 11px 'Barlow Condensed', sans-serif",'2px');
-      ctx.fillText(fixtureLines.sub.toUpperCase(),X(lw*0.5),Y(lh*0.54)+S(41));
+      ctx.fillStyle='rgba(147,197,253,.6)';
+      shotFont(ctx,"700 20px 'Barlow Condensed', sans-serif",'2px');
+      ctx.fillText(shotFit(ctx,fixtureLines.sub.toUpperCase(),contentW-(titleX-SHOT_MARGIN)),titleX,152);
     }
   }
+  ctx.fillStyle='rgba(147,197,253,.22)';
+  ctx.fillRect(SHOT_MARGIN,SHOT_HEADER_H-26,contentW,2);
 
-  // Player tags.
+  // ── Ground ──
+  const cx=SHOT_W/2,cy=fieldTop+fieldH/2,rx=contentW/2,ry=fieldH/2-6;
+  ctx.strokeStyle='rgba(255,255,255,.34)';
+  ctx.lineWidth=3;
+  ctx.beginPath();
+  ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);
+  ctx.stroke();
+  const goalH=36,behindH=23,postGap=19;
+  [[-1.5,behindH],[-0.5,goalH],[0.5,goalH],[1.5,behindH]].forEach(([mult,len])=>{
+    ctx.beginPath();
+    ctx.moveTo(cx+postGap*mult,cy-ry);
+    ctx.lineTo(cx+postGap*mult,cy-ry+len);
+    ctx.moveTo(cx+postGap*mult,cy+ry);
+    ctx.lineTo(cx+postGap*mult,cy+ry-len);
+    ctx.stroke();
+  });
+  const sq=contentW*0.42;
+  ctx.strokeRect(cx-sq/2,cy-sq/2,sq,sq);
+  if(logo){
+    ctx.save();
+    ctx.globalAlpha=.5;
+    ctx.drawImage(logo,cx-58,cy-58,116,116);
+    ctx.restore();
+  }
+
+  // ── Field tags ──
   ctx.textBaseline='middle';
-  positions.forEach(p=>{
+  positions.filter(p=>!p.bench).forEach(p=>{
     const data=board.roster?.[p.id];
     const name=(typeof data==='object'?data?.name:data)||'';
-    const magW=p.bench?60:70,magH=20;
-    const left=(p.x/100)*lw-magW/2+5;
-    const top=(p.y/100)*lh-magH/2;
-
-    if(!name){
-      // Empty extra-bench rows would only add clutter to a shared team sheet.
-      if(p.label==='---')return;
-      ctx.save();
-      ctx.setLineDash([S(4),S(3)]);
-      ctx.strokeStyle='rgba(255,255,255,0.2)';
-      ctx.lineWidth=Math.max(1,S(1));
-      ctx.strokeRect(X((p.x/100)*lw-(p.bench?70:80)/2),Y(top),S(p.bench?70:80),S(magH));
-      ctx.restore();
-      ctx.fillStyle='rgba(255,255,255,0.2)';
-      ctx.textAlign='center';
-      shotFont(ctx,"700 8px 'Barlow Condensed', sans-serif",'0px');
-      ctx.fillText(p.label,X((p.x/100)*lw),Y(top+magH/2));
-      return;
-    }
-
-    const tone=HUES[entryHue(data)]||null;
-    if(tone){
-      ctx.save();
-      ctx.shadowColor=tone.glow;
-      ctx.shadowBlur=S(9);
-    }
-    ctx.fillStyle=tone?tone.fill:MAGNET_FILL;
-    shotRoundRect(ctx,X(left),Y(top),S(magW),S(magH),S(2));
-    ctx.fill();
-    if(tone)ctx.restore();
-
-    const badge=p.id==='emg'?'E':((typeof data==='object'?data?.badge:'')||'');
-    if(badge){
-      ctx.beginPath();
-      ctx.arc(X(left+1),Y(top+magH/2),S(11),0,Math.PI*2);
-      ctx.fillStyle='#6786b8';
-      ctx.fill();
-      ctx.strokeStyle='#fff';
-      ctx.lineWidth=S(1.5);
-      ctx.stroke();
-      ctx.fillStyle=p.id==='emg'?'#ff4444':'#fff';
-      ctx.textAlign='center';
-      shotFont(ctx,`700 ${graphemeCount(badge)===1?15:11}px 'Barlow Condensed', sans-serif`,'0px');
-      ctx.fillText(badge,X(left+1),Y(top+magH/2));
-    }
-
-    ctx.fillStyle=MAGNET_TEXT;
-    ctx.textAlign='left';
-    shotFont(ctx,`700 ${p.bench?12:13}px 'Barlow Condensed', sans-serif`,'0px');
-    const textLeft=left+(p.bench?12:16);
-    const textRoom=magW-(p.bench?14:20);
-    ctx.fillText(shotFit(ctx,name,S(textRoom)),X(textLeft),Y(top+magH/2));
+    if(!name)return;
+    shotTag(ctx,fieldX(p.x),fieldY(p.y),244,48,{
+      name,
+      badge:(typeof data==='object'?data?.badge:'')||'',
+      tone:HUES[entryHue(data)]||null,
+      size:27
+    });
   });
+
+  // ── Bench ──
+  const benchTop=fieldTop+fieldH;
+  const colW=contentW/SHOT_BENCH_COLS.length;
+  const colX=i=>SHOT_MARGIN+colW*(i+0.5);
+  ctx.fillStyle='rgba(147,197,253,.2)';
+  ctx.fillRect(SHOT_MARGIN,benchTop+10,contentW,2);
+  ctx.fillStyle='rgba(191,219,254,.5)';
+  shotFont(ctx,"400 17px 'Bebas Neue', sans-serif",'4px');
+  ctx.textAlign='center';
+  ctx.fillText('INTERCHANGE',SHOT_MARGIN+colW*2,benchTop+40);
+  ctx.fillText('EMERGENCY',colX(4),benchTop+40);
+
+  const benchRows=[...new Set(positions.filter(p=>p.bench).map(p=>p.y))].sort((a,b)=>a-b);
+  const rowTop=benchTop+62;
+  const rowH=(SHOT_BENCH_H-72)/benchRows.length;
+  positions.filter(p=>p.bench).forEach(p=>{
+    const data=board.roster?.[p.id];
+    const name=(typeof data==='object'?data?.name:data)||'';
+    if(!name)return;
+    const col=SHOT_BENCH_COLS.indexOf(p.x);
+    const row=benchRows.indexOf(p.y);
+    if(col<0||row<0)return;
+    const isEmg=p.id==='emg';
+    shotTag(ctx,colX(col),rowTop+rowH*(row+0.5),188,40,{
+      name,
+      badge:isEmg?'E':((typeof data==='object'?data?.badge:'')||''),
+      badgeColor:isEmg?'#ff4444':'#fff',
+      tone:HUES[entryHue(data)]||null,
+      size:22
+    });
+  });
+
+  // ── Footer ──
+  ctx.textAlign='left';
+  ctx.textBaseline='middle';
+  ctx.fillStyle='rgba(147,197,253,.45)';
+  shotFont(ctx,"400 20px 'Bebas Neue', sans-serif",'4px');
+  ctx.fillText('UNSW-ES BULLDOGS',SHOT_MARGIN,SHOT_H-SHOT_FOOTER_H/2);
+  if(fixtureLines&&fixtureLines.match==='BYE'){
+    ctx.textAlign='right';
+    ctx.fillText('BYE ROUND',SHOT_W-SHOT_MARGIN,SHOT_H-SHOT_FOOTER_H/2);
+  }
 
   return canvas;
 }
