@@ -158,13 +158,27 @@ function cleanOpponentName(name) {
     .trim();
 }
 
-// PlayHQ lists a bye as a normal dated fixture where the opposing side is not a
-// DiscoverTeam — either a dedicated bye node or an empty side. Without this the
-// `... on DiscoverTeam` fragment yields no name and the bye surfaces as a
-// phantom "vs Opponent TBC" match.
+// Defensive: some feeds do list a bye as a dated fixture whose opposing side is
+// not a DiscoverTeam. The `... on DiscoverTeam` fragment yields no name there,
+// which would otherwise surface as a phantom "vs Opponent TBC" match.
 function isByeOpponent(opponent) {
   if (!opponent) return true;
   return /bye/i.test(opponent.__typename || "");
+}
+
+// The Sydney-local Monday–Sunday window containing `now`. A team on a bye is
+// simply missing from its own fixture feed that week — PlayHQ drops the round
+// rather than emitting an empty one — so its next game sits in a later round.
+// Comparing against this window is what separates "playing later this week"
+// from "on a bye, next game is a future round".
+function weekWindow(now) {
+  const [year, month, day] = dateKeyInTimeZone(now, SYDNEY_TIME_ZONE).split("-").map(Number);
+  const cursor = new Date(Date.UTC(year, month - 1, day));
+  const weekday = cursor.getUTCDay();
+  cursor.setUTCDate(cursor.getUTCDate() - weekday + (weekday === 0 ? -6 : 1));
+  const start = cursor.toISOString().slice(0, 10);
+  cursor.setUTCDate(cursor.getUTCDate() + 6);
+  return { start, end: cursor.toISOString().slice(0, 10) };
 }
 
 function forfeitState(game, side) {
@@ -176,17 +190,25 @@ function forfeitState(game, side) {
 
 async function buildBoardFixtures(now = new Date()) {
   const today = dateKeyInTimeZone(now, SYDNEY_TIME_ZONE);
+  const week = weekWindow(now);
   const fixtureEntries = await Promise.all(BOARD_FIXTURE_TEAMS.map(async team => {
     const fixtureData = await playHqQuery(UPCOMING_FIXTURE_QUERY, { teamId: team.teamId });
     const candidates = [];
+    // Tracked across the whole feed, not just upcoming games: a side that has
+    // already played this week is not on a bye, even though its game has
+    // dropped out of the candidate list.
+    let playsThisWeek = false;
 
     (fixtureData?.discoverTeamFixture || []).forEach((round, roundIndex) => {
       (round.games || []).forEach(game => {
         const side = game.home?.id === team.teamId
           ? "home"
           : game.away?.id === team.teamId ? "away" : null;
-        if (!side || !game.date || game.date < today) return;
+        if (!side || !game.date) return;
         const opponent = side === "home" ? game.away : game.home;
+        if (isByeOpponent(opponent)) return;
+        if (game.date >= week.start && game.date <= week.end) playsThisWeek = true;
+        if (game.date < today) return;
         candidates.push({ game, side, opponent, roundName: round.name || "Upcoming", roundIndex });
       });
     });
@@ -199,20 +221,38 @@ async function buildBoardFixtures(now = new Date()) {
 
     const next = candidates[0];
     if (!next) return [team.shortName, null];
-    // A bye has no opponent, no venue allocation and no result, so the
-    // opponent/forfeit fields stay null rather than carrying placeholder text.
-    const bye = isByeOpponent(next.opponent);
+    // No real game inside the current week means the grade is on a bye. The next
+    // fixture is still reported so the board can say when the team is out again,
+    // but it must not be presented as this week's match.
+    if (!playsThisWeek) {
+      return [team.shortName, {
+        gameId: null,
+        round: null,
+        date: null,
+        time: null,
+        timezone: SYDNEY_TIME_ZONE,
+        side: null,
+        bye: true,
+        opponent: null,
+        status: null,
+        forfeit: null,
+        nextRound: next.roundName,
+        nextDate: next.game.date
+      }];
+    }
     return [team.shortName, {
       gameId: next.game.id,
       round: next.roundName,
       date: next.game.date,
-      time: bye ? null : (next.game.allocation?.time || null),
+      time: next.game.allocation?.time || null,
       timezone: next.game.allocation?.timezone || SYDNEY_TIME_ZONE,
-      side: bye ? null : next.side,
-      bye,
-      opponent: bye ? null : cleanOpponentName(next.opponent?.name),
+      side: next.side,
+      bye: false,
+      opponent: cleanOpponentName(next.opponent?.name),
       status: next.game.status?.value || null,
-      forfeit: bye ? null : forfeitState(next.game, next.side)
+      forfeit: forfeitState(next.game, next.side),
+      nextRound: null,
+      nextDate: null
     }];
   }));
 

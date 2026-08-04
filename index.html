@@ -50,7 +50,8 @@
   .divider{position:absolute;left:5%;width:90%;height:1px;background:rgba(255,255,255,0.1);z-index:2;pointer-events:none}
   .fixture-overlay{position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);z-index:2;width:72%;pointer-events:none;text-align:center;text-transform:uppercase;color:rgba(255,255,255,.28);text-shadow:0 2px 8px rgba(0,0,0,.38);}
   .fixture-overlay.initial-load{animation:fixture-flash .48s ease-out 1;}
-  .fixture-kicker{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;line-height:1;letter-spacing:2px;color:rgba(255,255,255,.2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .fixture-kicker,.fixture-sub{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;line-height:1;letter-spacing:2px;color:rgba(255,255,255,.2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .fixture-sub{margin-top:6px;}
   .fixture-match{margin-top:5px;font-family:'Bebas Neue',sans-serif;font-size:clamp(17px,5vw,23px);line-height:1.05;letter-spacing:1.5px;white-space:normal;text-wrap:balance;}
   .fixture-overlay.forfeit .fixture-match,.fixture-overlay.cancelled .fixture-match{color:rgba(254,202,202,.34);}
   .fixture-overlay.bye .fixture-match{color:rgba(191,219,254,.3);letter-spacing:6px;}
@@ -1075,10 +1076,19 @@ function renderFixtureOverlay(boardId,groundEl){
   match.className='fixture-match';
   const opponent=fixture.opponent||'Opponent TBC';
   const opponentPrefix=fixture.side==='away'?'@':'vs';
+  // Third line: where to turn up for an away game, or when the side is next out
+  // if this week is a bye. Home games are always at the club's own ground.
+  const sub=document.createElement('div');
+  sub.className='fixture-sub';
+  if(!fixture.bye&&fixture.side==='away'&&fixture.venue)sub.textContent=fixture.venue;
 
   if(fixture.bye){
     overlay.classList.add('bye');
+    kicker.textContent='THIS WEEK';
     match.textContent='BYE';
+    if(fixture.nextDate){
+      sub.textContent=`NEXT · ${fixture.nextRound||'TBC'} · ${formatFixtureDate(fixture.nextDate)}`;
+    }
   }else if(fixture.forfeit==='club'){
     overlay.classList.add('forfeit');
     match.textContent=`UNSW-ES FORFEIT · ${opponentPrefix} ${opponent}`;
@@ -1093,8 +1103,10 @@ function renderFixtureOverlay(boardId,groundEl){
   }
 
   overlay.setAttribute('role','note');
-  overlay.setAttribute('aria-label',`${kicker.textContent}. ${match.textContent}`);
+  overlay.setAttribute('aria-label',
+    [kicker.textContent,match.textContent,sub.textContent].filter(Boolean).join('. '));
   overlay.append(kicker,match);
+  if(sub.textContent)overlay.appendChild(sub);
   groundEl.appendChild(overlay);
 }
 
