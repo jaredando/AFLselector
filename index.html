@@ -697,29 +697,105 @@ function duplicateNameKey(name){
   return String(name??'').toLocaleLowerCase('en-AU').replace(/[^a-z0-9]/g,'');
 }
 
+// Split into a first name and whatever follows it, so "Tristan M" can be told
+// apart from "Tristan B" while still collapsing to the same key as "TristanM".
+function parseDisplayName(name){
+  const cleaned=String(name??'')
+    .toLocaleLowerCase('en-AU')
+    .replace(/[^a-z0-9\s]/g,'')
+    .trim()
+    .replace(/\s+/g,' ');
+  if(!cleaned)return null;
+  const tokens=cleaned.split(' ');
+  return {key:tokens.join(''),first:tokens[0],rest:tokens.slice(1).join('')};
+}
+
+// Shortest truncation treated as a nickname. Four keeps "Trist"/"Tristan" and
+// "Nick"/"Nicholas" while refusing to guess at three-letter names, where a
+// genuine "Sam" and "Sammy" are indistinguishable from two different players.
+const NICKNAME_MIN_LENGTH=4;
+
+function firstNamesLikelySame(a,b){
+  if(a===b)return true;
+  const[short,long]=a.length<b.length?[a,b]:[b,a];
+  return short.length>=NICKNAME_MIN_LENGTH&&long.startsWith(short);
+}
+
+// A surname only disambiguates when both sides have one. A lone initial is
+// treated as agreeing with a full surname starting with it ("M" vs "Murphy"),
+// but two different initials mean two different players.
+function surnamesLikelySame(a,b){
+  if(!a||!b)return true;
+  if(a===b)return true;
+  if(a.length===1)return b.startsWith(a);
+  if(b.length===1)return a.startsWith(b);
+  return false;
+}
+
+function likelySamePlayer(a,b){
+  return firstNamesLikelySame(a.first,b.first)&&surnamesLikelySame(a.rest,b.rest);
+}
+
 // Scoped to a single board: the field roster plus its extra bench. Names on
 // other boards are unrelated, since a player can be listed for more than one
-// grade across the weekend.
+// grade across the weekend. Returns key -> 'exact' | 'near'.
 function duplicateNameKeysForBoard(boardId){
   const board=allData.boards[boardId];
-  const counts=new Map();
+  const variants=new Map();
   if(board){
     [board.roster,board.inventory].forEach(source=>{
       Object.values(source||{}).forEach(entry=>{
-        const key=duplicateNameKey(typeof entry==='object'?entry?.name:entry);
-        if(key)counts.set(key,(counts.get(key)||0)+1);
+        const parsed=parseDisplayName(typeof entry==='object'?entry?.name:entry);
+        if(!parsed)return;
+        const seen=variants.get(parsed.key);
+        if(seen)seen.count++;
+        else variants.set(parsed.key,{parsed,count:1});
       });
     });
   }
-  return new Set([...counts.entries()].filter(([,count])=>count>1).map(([key])=>key));
+
+  const flagged=new Map();
+  const list=[...variants.values()];
+  list.forEach(v=>{if(v.count>1)flagged.set(v.parsed.key,'exact');});
+
+  const neighbours=new Map(list.map(v=>[v.parsed.key,[]]));
+  for(let i=0;i<list.length;i++){
+    for(let j=i+1;j<list.length;j++){
+      if(!likelySamePlayer(list[i].parsed,list[j].parsed))continue;
+      neighbours.get(list[i].parsed.key).push(list[j].parsed);
+      neighbours.get(list[j].parsed.key).push(list[i].parsed);
+    }
+  }
+
+  // A short form matching two players who are clearly distinct from each other
+  // — "Trist" alongside both "Tristan M" and "Tristan B" — cannot be resolved,
+  // so it is left alone rather than guessed at. This is what stops a board with
+  // several Tristans on it from lighting up.
+  const ambiguous=new Set();
+  neighbours.forEach((others,key)=>{
+    for(let i=0;i<others.length;i++){
+      for(let j=i+1;j<others.length;j++){
+        if(!likelySamePlayer(others[i],others[j]))ambiguous.add(key);
+      }
+    }
+  });
+
+  neighbours.forEach((others,key)=>{
+    if(ambiguous.has(key)||flagged.has(key))return;
+    if(others.some(other=>!ambiguous.has(other.key)))flagged.set(key,'near');
+  });
+  return flagged;
 }
 
-function markDuplicateMagnet(mag,name,duplicateKeys){
-  if(!duplicateKeys.has(duplicateNameKey(name)))return;
+function markDuplicateMagnet(mag,name,duplicateInfo){
+  const reason=duplicateInfo.get(duplicateNameKey(name));
+  if(!reason)return;
   mag.classList.add('duplicate');
   // The pulse is a one-off nudge on first paint, not a permanent animation.
   if(duplicateIntroPending)mag.classList.add('initial-load');
-  mag.title=`${name} is listed more than once on this board`;
+  mag.title=reason==='exact'
+    ?`${name} is listed more than once on this board`
+    :`${name} looks like another name on this board`;
 }
 
 function fixtureGradeForBoardName(name){
@@ -968,7 +1044,7 @@ function renderInventory(boardId){
   if(!allData.boards[boardId]) return;
   if(!allData.boards[boardId].inventory) allData.boards[boardId].inventory={};
   const inv=allData.boards[boardId].inventory;
-  const duplicateKeys=duplicateNameKeysForBoard(boardId);
+  const duplicateInfo=duplicateNameKeysForBoard(boardId);
   inventorySlots.forEach(s=>{
     const data=inv[s.id];
     const name=typeof data==='object'?data.name:data;
@@ -987,7 +1063,7 @@ function renderInventory(boardId){
       mag.style.left=s.x+'%';mag.style.top=s.y+'%';
       const badgeFontSize=(graphemeCount(badge||'')===1)?'15px':'11px';
       mag.innerHTML=`<div class="mag-badge" style="font-size:${badgeFontSize}">${badge||''}</div><div class="mag-name">${name}</div>`;
-      markDuplicateMagnet(mag,name,duplicateKeys);
+      markDuplicateMagnet(mag,name,duplicateInfo);
       if(!isViewOnly&&!isCloudBlocked){
         mag.addEventListener('pointerdown',ev=>{
           if(!ev.isPrimary||ev.button!==0)return;
@@ -1169,7 +1245,7 @@ function renderBoard(boardId,groundEl){
   });
   renderFixtureOverlay(boardId,groundEl);
   const boardRoster=allData.boards[boardId]?.roster||{};
-  const duplicateKeys=duplicateNameKeysForBoard(boardId);
+  const duplicateInfo=duplicateNameKeysForBoard(boardId);
   positions.forEach(p=>{
     const data=boardRoster[p.id],name=typeof data==='object'?data.name:data,badge=typeof data==='object'?data.badge:'';
     const slot=document.createElement('div');
@@ -1190,7 +1266,7 @@ function renderBoard(boardId,groundEl){
       const badgeColor=isEmg?'#ff4444':'#fff';
       const badgeFontSize=(graphemeCount(displayBadge)===1)?'15px':'11px';
       mag.innerHTML=`<div class="mag-badge" style="font-size:${badgeFontSize};color:${badgeColor}">${displayBadge}</div><div class="mag-name">${name}</div>`;
-      markDuplicateMagnet(mag,name,duplicateKeys);
+      markDuplicateMagnet(mag,name,duplicateInfo);
       mag.dataset.posId=p.id;
       mag.dataset.boardId=boardId;
       if (!isViewOnly&&!isCloudBlocked) {
