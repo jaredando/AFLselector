@@ -53,6 +53,7 @@
   .fixture-kicker{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;line-height:1;letter-spacing:2px;color:rgba(255,255,255,.2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .fixture-match{margin-top:5px;font-family:'Bebas Neue',sans-serif;font-size:clamp(17px,5vw,23px);line-height:1.05;letter-spacing:1.5px;white-space:normal;text-wrap:balance;}
   .fixture-overlay.forfeit .fixture-match,.fixture-overlay.cancelled .fixture-match{color:rgba(254,202,202,.34);}
+  .fixture-overlay.bye .fixture-match{color:rgba(191,219,254,.3);letter-spacing:6px;}
   @keyframes fixture-flash{0%{opacity:0;filter:brightness(1)}45%{opacity:1;filter:brightness(2.15)}100%{opacity:1;filter:brightness(1)}}
 
   /* ── Position slots & magnets ── */
@@ -1075,7 +1076,10 @@ function renderFixtureOverlay(boardId,groundEl){
   const opponent=fixture.opponent||'Opponent TBC';
   const opponentPrefix=fixture.side==='away'?'@':'vs';
 
-  if(fixture.forfeit==='club'){
+  if(fixture.bye){
+    overlay.classList.add('bye');
+    match.textContent='BYE';
+  }else if(fixture.forfeit==='club'){
     overlay.classList.add('forfeit');
     match.textContent=`UNSW-ES FORFEIT · ${opponentPrefix} ${opponent}`;
   }else if(fixture.forfeit==='opponent'){

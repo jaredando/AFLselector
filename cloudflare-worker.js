@@ -158,6 +158,15 @@ function cleanOpponentName(name) {
     .trim();
 }
 
+// PlayHQ lists a bye as a normal dated fixture where the opposing side is not a
+// DiscoverTeam — either a dedicated bye node or an empty side. Without this the
+// `... on DiscoverTeam` fragment yields no name and the bye surfaces as a
+// phantom "vs Opponent TBC" match.
+function isByeOpponent(opponent) {
+  if (!opponent) return true;
+  return /bye/i.test(opponent.__typename || "");
+}
+
 function forfeitState(game, side) {
   const outcome = game?.result?.[side]?.outcome?.value;
   if (outcome === "LOST_BY_FORFEIT") return "club";
@@ -190,16 +199,20 @@ async function buildBoardFixtures(now = new Date()) {
 
     const next = candidates[0];
     if (!next) return [team.shortName, null];
+    // A bye has no opponent, no venue allocation and no result, so the
+    // opponent/forfeit fields stay null rather than carrying placeholder text.
+    const bye = isByeOpponent(next.opponent);
     return [team.shortName, {
       gameId: next.game.id,
       round: next.roundName,
       date: next.game.date,
-      time: next.game.allocation?.time || null,
+      time: bye ? null : (next.game.allocation?.time || null),
       timezone: next.game.allocation?.timezone || SYDNEY_TIME_ZONE,
-      side: next.side,
-      opponent: cleanOpponentName(next.opponent?.name),
+      side: bye ? null : next.side,
+      bye,
+      opponent: bye ? null : cleanOpponentName(next.opponent?.name),
       status: next.game.status?.value || null,
-      forfeit: forfeitState(next.game, next.side)
+      forfeit: bye ? null : forfeitState(next.game, next.side)
     }];
   }));
 
