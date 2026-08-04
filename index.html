@@ -64,6 +64,16 @@
   .pos-slot.filled{border:none;background:transparent;pointer-events:none}
   .magnet{z-index:50;background:#fff;color:#073175;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;display:flex;align-items:center;padding:0 4px 0 16px;cursor:grab;box-shadow:0 2px 6px rgba(0,0,0,0.3);white-space:nowrap;transition:color 0.2s ease;}
   .magnet.warning{color:#b00000!important;}
+  /* Same player listed twice on one board. The wavy underline reads as an error
+     the way a spell-check squiggle does; the ring makes it findable among 22
+     magnets without having to read every name. */
+  .magnet.duplicate{box-shadow:0 2px 6px rgba(0,0,0,0.3),0 0 0 1.5px #dc2626;}
+  .magnet.duplicate .mag-name{text-decoration:underline wavy #dc2626;text-underline-offset:2px;text-decoration-thickness:1.5px;}
+  .magnet.duplicate.initial-load{animation:duplicate-pulse 1.4s ease-in-out 4;}
+  @keyframes duplicate-pulse{
+    0%,100%{box-shadow:0 2px 6px rgba(0,0,0,0.3),0 0 0 1.5px #dc2626}
+    50%{box-shadow:0 2px 6px rgba(0,0,0,0.3),0 0 0 5px rgba(220,38,38,.28)}
+  }
   /* Carry-progress ring shown while holding the magnet inside an edge zone */
   .magnet.carrying::before{
     content:'';position:absolute;left:-6px;top:50%;transform:translateY(-50%);
@@ -222,7 +232,7 @@
   @keyframes eligibility-spin{to{transform:rotate(360deg)}}
   @media(min-width:620px){#eligibilitySheet{left:50%;right:auto;width:min(600px,100vw);transform:translate(-50%,102%);border-radius:18px 18px 0 0;}#eligibilitySheet.open{transform:translate(-50%,0);}}
   @media(max-width:390px){#eligibilityBtn span{display:none}#eligibilityBtn{padding:0;width:44px}.top-actions{gap:4px}}
-  @media(prefers-reduced-motion:reduce){#eligibilityBackdrop,#eligibilitySheet{transition:none}.eligibility-spinner{animation-duration:1.6s}#eligibilityBtn.needs-attention{animation:none;border-color:#fbbf24}.fixture-overlay.initial-load{animation:none}}
+  @media(prefers-reduced-motion:reduce){#eligibilityBackdrop,#eligibilitySheet{transition:none}.eligibility-spinner{animation-duration:1.6s}#eligibilityBtn.needs-attention{animation:none;border-color:#fbbf24}.fixture-overlay.initial-load{animation:none}.magnet.duplicate.initial-load{animation:none}}
 
   /* ── Sync & indicators ── */
   #syncStatus{position:absolute;bottom:10px;right:28px;z-index:100;font-size:9px;color:rgba(255,255,255,0.3);}
@@ -526,6 +536,7 @@ let selectedEligibilityGrade='MD3';
 let boardFixtures={};
 let boardFixturesLoaded=false;
 let fixtureOverlayIntroPending=false;
+let duplicateIntroPending=true;
 
 const positions=[
   {id:'fpl',x:22,y:6,label:'FP'},{id:'ff',x:50,y:4,label:'FF'},{id:'fpr',x:78,y:6,label:'FP'},
@@ -677,6 +688,38 @@ function limitGraphemes(str,max){
     return segs.slice(0,max).map(s=>s.segment).join('');
   }
   return[...str].slice(0,max).join('');
+}
+
+// The same player named twice on one board is always a selection mistake.
+// Names are compared the way the worker compares them — case, spacing and
+// punctuation insensitive — so "O'Brien" and "OBrien" count as one player.
+function duplicateNameKey(name){
+  return String(name??'').toLocaleLowerCase('en-AU').replace(/[^a-z0-9]/g,'');
+}
+
+// Scoped to a single board: the field roster plus its extra bench. Names on
+// other boards are unrelated, since a player can be listed for more than one
+// grade across the weekend.
+function duplicateNameKeysForBoard(boardId){
+  const board=allData.boards[boardId];
+  const counts=new Map();
+  if(board){
+    [board.roster,board.inventory].forEach(source=>{
+      Object.values(source||{}).forEach(entry=>{
+        const key=duplicateNameKey(typeof entry==='object'?entry?.name:entry);
+        if(key)counts.set(key,(counts.get(key)||0)+1);
+      });
+    });
+  }
+  return new Set([...counts.entries()].filter(([,count])=>count>1).map(([key])=>key));
+}
+
+function markDuplicateMagnet(mag,name,duplicateKeys){
+  if(!duplicateKeys.has(duplicateNameKey(name)))return;
+  mag.classList.add('duplicate');
+  // The pulse is a one-off nudge on first paint, not a permanent animation.
+  if(duplicateIntroPending)mag.classList.add('initial-load');
+  mag.title=`${name} is listed more than once on this board`;
 }
 
 function fixtureGradeForBoardName(name){
@@ -925,6 +968,7 @@ function renderInventory(boardId){
   if(!allData.boards[boardId]) return;
   if(!allData.boards[boardId].inventory) allData.boards[boardId].inventory={};
   const inv=allData.boards[boardId].inventory;
+  const duplicateKeys=duplicateNameKeysForBoard(boardId);
   inventorySlots.forEach(s=>{
     const data=inv[s.id];
     const name=typeof data==='object'?data.name:data;
@@ -943,6 +987,7 @@ function renderInventory(boardId){
       mag.style.left=s.x+'%';mag.style.top=s.y+'%';
       const badgeFontSize=(graphemeCount(badge||'')===1)?'15px':'11px';
       mag.innerHTML=`<div class="mag-badge" style="font-size:${badgeFontSize}">${badge||''}</div><div class="mag-name">${name}</div>`;
+      markDuplicateMagnet(mag,name,duplicateKeys);
       if(!isViewOnly&&!isCloudBlocked){
         mag.addEventListener('pointerdown',ev=>{
           if(!ev.isPrimary||ev.button!==0)return;
@@ -1124,6 +1169,7 @@ function renderBoard(boardId,groundEl){
   });
   renderFixtureOverlay(boardId,groundEl);
   const boardRoster=allData.boards[boardId]?.roster||{};
+  const duplicateKeys=duplicateNameKeysForBoard(boardId);
   positions.forEach(p=>{
     const data=boardRoster[p.id],name=typeof data==='object'?data.name:data,badge=typeof data==='object'?data.badge:'';
     const slot=document.createElement('div');
@@ -1144,6 +1190,7 @@ function renderBoard(boardId,groundEl){
       const badgeColor=isEmg?'#ff4444':'#fff';
       const badgeFontSize=(graphemeCount(displayBadge)===1)?'15px':'11px';
       mag.innerHTML=`<div class="mag-badge" style="font-size:${badgeFontSize};color:${badgeColor}">${displayBadge}</div><div class="mag-name">${name}</div>`;
+      markDuplicateMagnet(mag,name,duplicateKeys);
       mag.dataset.posId=p.id;
       mag.dataset.boardId=boardId;
       if (!isViewOnly&&!isCloudBlocked) {
@@ -1185,6 +1232,11 @@ function renderAllBoards(){
   grounds.forEach(groundEl=>{
     renderBoard(groundEl.dataset.boardId,groundEl);
   });
+  // Held until a duplicate has actually been painted, so a board whose roster
+  // arrives late from the cloud still gets its one pulse.
+  if(duplicateIntroPending&&grounds.some(groundEl=>groundEl.querySelector('.magnet.duplicate.initial-load'))){
+    duplicateIntroPending=false;
+  }
   if(fixtureOverlayIntroPending&&grounds.some(groundEl=>groundEl.querySelector('.fixture-overlay.initial-load'))){
     fixtureOverlayIntroPending=false;
   }
