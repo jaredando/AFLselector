@@ -64,16 +64,17 @@
   .pos-slot.filled{border:none;background:transparent;pointer-events:none}
   .magnet{z-index:50;background:#fff;color:#073175;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;display:flex;align-items:center;padding:0 4px 0 16px;cursor:grab;box-shadow:0 2px 6px rgba(0,0,0,0.3);white-space:nowrap;transition:color 0.2s ease;}
   .magnet.warning{color:#b00000!important;}
-  /* Status hues fill the whole tag so selection state reads at a glance from
-     across the board. Each sets --dup-mark, because the duplicate squiggle's
-     default red is invisible on a red tag and muddy on a green one. */
-  .magnet.hue-green{background:#16a34a;color:#fff;--dup-mark:#fff;--dup-glow:rgba(255,255,255,.4);}
-  .magnet.hue-yellow{background:#facc15;color:#422006;--dup-mark:#b91c1c;--dup-glow:rgba(185,28,28,.32);}
-  .magnet.hue-red{background:#dc2626;color:#fff;--dup-mark:#fff;--dup-glow:rgba(255,255,255,.4);}
+  /* A wash over the white tag plus a soft outer glow, rather than a solid fill,
+     so a coloured tag still reads as a name first. The glow lives in --hue-glow
+     so the duplicate ring below can compose with it instead of replacing it. */
+  .magnet.hue-green,.magnet.hue-yellow,.magnet.hue-red{box-shadow:0 2px 6px rgba(0,0,0,0.3),var(--hue-glow);}
+  .magnet.hue-green{background:#a7f3d0;--hue-glow:0 0 9px 1px rgba(34,197,94,.6);--dup-mark:#b91c1c;--dup-glow:rgba(185,28,28,.32);}
+  .magnet.hue-yellow{background:#fde68a;--hue-glow:0 0 9px 1px rgba(234,179,8,.6);--dup-mark:#b91c1c;--dup-glow:rgba(185,28,28,.32);}
+  .magnet.hue-red{background:#fecaca;--hue-glow:0 0 9px 1px rgba(239,68,68,.65);--dup-mark:#7f1d1d;--dup-glow:rgba(127,29,29,.32);}
   /* Same player listed twice on one board. The wavy underline reads as an error
      the way a spell-check squiggle does; the ring makes it findable among 22
      magnets without having to read every name. */
-  .magnet.duplicate{box-shadow:0 2px 6px rgba(0,0,0,0.3),0 0 0 1.5px var(--dup-mark,#dc2626);}
+  .magnet.duplicate{box-shadow:0 2px 6px rgba(0,0,0,0.3),var(--hue-glow,0 0 0 0 transparent),0 0 0 1.5px var(--dup-mark,#dc2626);}
   /* .mag-name needs overflow:hidden for the ellipsis, which clips the wave to
      its line box. A thinner wave sits closer under the letters, and the taller
      line-height adds room below the baseline for it. Both halves of the extra
@@ -82,8 +83,8 @@
   .magnet.duplicate .mag-name{line-height:1.5;text-decoration-line:underline;text-decoration-style:wavy;text-decoration-color:var(--dup-mark,#dc2626);text-underline-offset:1px;text-decoration-thickness:1px;}
   .magnet.duplicate.initial-load{animation:duplicate-pulse 1.4s ease-in-out 4;}
   @keyframes duplicate-pulse{
-    0%,100%{box-shadow:0 2px 6px rgba(0,0,0,0.3),0 0 0 1.5px var(--dup-mark,#dc2626)}
-    50%{box-shadow:0 2px 6px rgba(0,0,0,0.3),0 0 0 5px var(--dup-glow,rgba(220,38,38,.28))}
+    0%,100%{box-shadow:0 2px 6px rgba(0,0,0,0.3),var(--hue-glow,0 0 0 0 transparent),0 0 0 1.5px var(--dup-mark,#dc2626)}
+    50%{box-shadow:0 2px 6px rgba(0,0,0,0.3),var(--hue-glow,0 0 0 0 transparent),0 0 0 5px var(--dup-glow,rgba(220,38,38,.28))}
   }
   /* Carry-progress ring shown while holding the magnet inside an edge zone */
   .magnet.carrying::before{
@@ -298,11 +299,12 @@
   #editBox .clear-btn{background:#374151;color:#fff}
   #editBox .hue-row{display:flex;gap:6px;}
   /* Class selectors beat the generic `#editBox button` rule above. */
-  #editBox .hue-swatch{flex:1;height:40px;border-radius:8px;border:2px solid transparent;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:10px;letter-spacing:.6px;padding:0;}
-  #editBox .hue-swatch[data-hue=""]{background:#fff;color:#073175;}
-  #editBox .hue-swatch[data-hue="green"]{background:#16a34a;color:#fff;}
-  #editBox .hue-swatch[data-hue="yellow"]{background:#facc15;color:#422006;}
-  #editBox .hue-swatch[data-hue="red"]{background:#dc2626;color:#fff;}
+  /* Each swatch previews the tag fill itself, so no caption is needed. */
+  #editBox .hue-swatch{flex:1;height:40px;border-radius:8px;border:2px solid transparent;cursor:pointer;padding:0;font-size:0;}
+  #editBox .hue-swatch[data-hue=""]{background:#fff;}
+  #editBox .hue-swatch[data-hue="green"]{background:#a7f3d0;box-shadow:0 0 9px 1px rgba(34,197,94,.6);}
+  #editBox .hue-swatch[data-hue="yellow"]{background:#fde68a;box-shadow:0 0 9px 1px rgba(234,179,8,.6);}
+  #editBox .hue-swatch[data-hue="red"]{background:#fecaca;box-shadow:0 0 9px 1px rgba(239,68,68,.65);}
   #editBox .hue-swatch.selected{border-color:#60a5fa;box-shadow:0 0 0 2px rgba(96,165,250,.4);}
   #editBox .hue-swatch:focus-visible{outline:2px solid #93c5fd;outline-offset:2px;}
 
@@ -470,12 +472,14 @@
     <input id="editInput" type="text" placeholder="Name…" autocomplete="off"/>
     <label>BADGE (C, 10, 🇮🇪)</label>
     <input id="badgeInput" type="text" placeholder="C, 10, 🇮🇪…" autocomplete="off"/>
-    <label>STATUS</label>
-    <div class="hue-row" id="hueRow" role="group" aria-label="Selection status">
-      <button type="button" class="hue-swatch" data-hue="" aria-pressed="true">NONE</button>
-      <button type="button" class="hue-swatch" data-hue="green" aria-pressed="false">LOCKED</button>
-      <button type="button" class="hue-swatch" data-hue="yellow" aria-pressed="false">MAYBE</button>
-      <button type="button" class="hue-swatch" data-hue="red" aria-pressed="false">OUT</button>
+    <label>TAG COLOUR</label>
+    <!-- Swatches are unlabelled and described only by colour. What each one
+         means is a coaching convention kept out of the page entirely. -->
+    <div class="hue-row" id="hueRow" role="group" aria-label="Tag colour">
+      <button type="button" class="hue-swatch" data-hue="" aria-pressed="true" aria-label="No colour"></button>
+      <button type="button" class="hue-swatch" data-hue="green" aria-pressed="false" aria-label="Green"></button>
+      <button type="button" class="hue-swatch" data-hue="yellow" aria-pressed="false" aria-label="Yellow"></button>
+      <button type="button" class="hue-swatch" data-hue="red" aria-pressed="false" aria-label="Red"></button>
     </div>
     <div class="btn-row">
       <button class="save-btn" id="editSave">SAVE</button>
@@ -577,11 +581,15 @@ let duplicateIntroPending=true;
 let editingHue='';
 
 // Tag fill colours, shared by the DOM magnets and the exported image so the
-// two cannot drift apart.
+// two cannot drift apart. What each colour means is deliberately not recorded
+// anywhere in the page: the meaning is a coaching convention, and anyone with
+// a view-only link can read tooltips and markup.
+// A hue only tints the tag and adds a glow; the text stays the standard colour,
+// so name legibility never depends on which hue is set.
 const HUES={
-  green:{label:'Locked in',fill:'#16a34a',text:'#ffffff'},
-  yellow:{label:'Unconfirmed',fill:'#facc15',text:'#422006'},
-  red:{label:'Out',fill:'#dc2626',text:'#ffffff'}
+  green:{fill:'#a7f3d0',glow:'rgba(34,197,94,.6)'},
+  yellow:{fill:'#fde68a',glow:'rgba(234,179,8,.6)'},
+  red:{fill:'#fecaca',glow:'rgba(239,68,68,.65)'}
 };
 const MAGNET_FILL='#ffffff',MAGNET_TEXT='#073175';
 const CLUB_LOGO_URL='https://aflnational.com/wp-content/uploads/2025/12/UNSW-Eastern-Suburbs-Bulldogs-AFL-footy-club-logo.png';
@@ -857,12 +865,8 @@ function entryHue(data){
   return HUES[hue]?hue:'';
 }
 
-// Colour alone should not carry the meaning, so the hue is named in the
-// magnet's tooltip alongside any duplicate warning.
 function applyHue(mag,hue){
-  if(!hue)return'';
-  mag.classList.add(`hue-${hue}`);
-  return HUES[hue].label;
+  if(hue)mag.classList.add(`hue-${hue}`);
 }
 
 function setEditHue(hue){
@@ -1156,7 +1160,7 @@ function renderInventory(boardId){
       mag.style.left=s.x+'%';mag.style.top=s.y+'%';
       const badgeFontSize=(graphemeCount(badge||'')===1)?'15px':'11px';
       mag.innerHTML=`<div class="mag-badge" style="font-size:${badgeFontSize}">${badge||''}</div><div class="mag-name">${name}</div>`;
-      mag.title=applyHue(mag,entryHue(data));
+      applyHue(mag,entryHue(data));
       markDuplicateMagnet(mag,name,duplicateInfo);
       if(!isViewOnly&&!isCloudBlocked){
         mag.addEventListener('pointerdown',ev=>{
@@ -1361,7 +1365,7 @@ function renderBoard(boardId,groundEl){
       const badgeColor=isEmg?'#ff4444':'#fff';
       const badgeFontSize=(graphemeCount(displayBadge)===1)?'15px':'11px';
       mag.innerHTML=`<div class="mag-badge" style="font-size:${badgeFontSize};color:${badgeColor}">${displayBadge}</div><div class="mag-name">${name}</div>`;
-      mag.title=applyHue(mag,entryHue(data));
+      applyHue(mag,entryHue(data));
       markDuplicateMagnet(mag,name,duplicateInfo);
       mag.dataset.posId=p.id;
       mag.dataset.boardId=boardId;
@@ -2021,10 +2025,16 @@ async function buildBoardImage(boardId){
       return;
     }
 
-    const hue=entryHue(data);
-    ctx.fillStyle=hue?HUES[hue].fill:MAGNET_FILL;
+    const tone=HUES[entryHue(data)]||null;
+    if(tone){
+      ctx.save();
+      ctx.shadowColor=tone.glow;
+      ctx.shadowBlur=S(9);
+    }
+    ctx.fillStyle=tone?tone.fill:MAGNET_FILL;
     shotRoundRect(ctx,X(left),Y(top),S(magW),S(magH),S(2));
     ctx.fill();
+    if(tone)ctx.restore();
 
     const badge=p.id==='emg'?'E':((typeof data==='object'?data?.badge:'')||'');
     if(badge){
@@ -2041,7 +2051,7 @@ async function buildBoardImage(boardId){
       ctx.fillText(badge,X(left+1),Y(top+magH/2));
     }
 
-    ctx.fillStyle=hue?HUES[hue].text:MAGNET_TEXT;
+    ctx.fillStyle=MAGNET_TEXT;
     ctx.textAlign='left';
     shotFont(ctx,`700 ${p.bench?12:13}px 'Barlow Condensed', sans-serif`,'0px');
     const textLeft=left+(p.bench?12:16);
