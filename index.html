@@ -64,20 +64,26 @@
   .pos-slot.filled{border:none;background:transparent;pointer-events:none}
   .magnet{z-index:50;background:#fff;color:#073175;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;display:flex;align-items:center;padding:0 4px 0 16px;cursor:grab;box-shadow:0 2px 6px rgba(0,0,0,0.3);white-space:nowrap;transition:color 0.2s ease;}
   .magnet.warning{color:#b00000!important;}
+  /* Status hues fill the whole tag so selection state reads at a glance from
+     across the board. Each sets --dup-mark, because the duplicate squiggle's
+     default red is invisible on a red tag and muddy on a green one. */
+  .magnet.hue-green{background:#16a34a;color:#fff;--dup-mark:#fff;--dup-glow:rgba(255,255,255,.4);}
+  .magnet.hue-yellow{background:#facc15;color:#422006;--dup-mark:#b91c1c;--dup-glow:rgba(185,28,28,.32);}
+  .magnet.hue-red{background:#dc2626;color:#fff;--dup-mark:#fff;--dup-glow:rgba(255,255,255,.4);}
   /* Same player listed twice on one board. The wavy underline reads as an error
      the way a spell-check squiggle does; the ring makes it findable among 22
      magnets without having to read every name. */
-  .magnet.duplicate{box-shadow:0 2px 6px rgba(0,0,0,0.3),0 0 0 1.5px #dc2626;}
+  .magnet.duplicate{box-shadow:0 2px 6px rgba(0,0,0,0.3),0 0 0 1.5px var(--dup-mark,#dc2626);}
   /* .mag-name needs overflow:hidden for the ellipsis, which clips the wave to
      its line box. A thinner wave sits closer under the letters, and the taller
      line-height adds room below the baseline for it. Both halves of the extra
      leading fall outside the glyphs, so the centred text does not move and the
      font size is untouched. */
-  .magnet.duplicate .mag-name{line-height:1.5;text-decoration:underline wavy #dc2626;text-underline-offset:1px;text-decoration-thickness:1px;}
+  .magnet.duplicate .mag-name{line-height:1.5;text-decoration-line:underline;text-decoration-style:wavy;text-decoration-color:var(--dup-mark,#dc2626);text-underline-offset:1px;text-decoration-thickness:1px;}
   .magnet.duplicate.initial-load{animation:duplicate-pulse 1.4s ease-in-out 4;}
   @keyframes duplicate-pulse{
-    0%,100%{box-shadow:0 2px 6px rgba(0,0,0,0.3),0 0 0 1.5px #dc2626}
-    50%{box-shadow:0 2px 6px rgba(0,0,0,0.3),0 0 0 5px rgba(220,38,38,.28)}
+    0%,100%{box-shadow:0 2px 6px rgba(0,0,0,0.3),0 0 0 1.5px var(--dup-mark,#dc2626)}
+    50%{box-shadow:0 2px 6px rgba(0,0,0,0.3),0 0 0 5px var(--dup-glow,rgba(220,38,38,.28))}
   }
   /* Carry-progress ring shown while holding the magnet inside an edge zone */
   .magnet.carrying::before{
@@ -163,6 +169,10 @@
   #menuBtn{background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#aaa;font-size:15px;width:32px;height:28px;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;}
   #activeBoardName{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'Bebas Neue',sans-serif;font-size:26px;color:rgba(255,255,255,0.35);letter-spacing:3px;pointer-events:none;white-space:nowrap;}
   #refreshBtn{background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#aaa;font-family:'Barlow Condensed',sans-serif;font-size:10px;padding:3px 7px;border-radius:4px;cursor:pointer;height:28px;}
+  #shotBtn{background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);color:#aaa;border-radius:4px;cursor:pointer;height:28px;width:30px;display:flex;align-items:center;justify-content:center;padding:0;}
+  #shotBtn svg{width:15px;height:15px;}
+  #shotBtn:active{background:rgba(96,165,250,.25);color:#dbeafe;}
+  #shotBtn[disabled]{opacity:.5;cursor:default;}
   .top-actions{display:flex;align-items:center;gap:6px;margin-left:auto;}
   #eligibilityBtn{height:44px;min-width:44px;padding:0 10px;border-radius:6px;border:1px solid rgba(96,165,250,.42);background:rgba(7,31,75,.88);color:#bfdbfe;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;}
   #eligibilityBtn svg{width:16px;height:16px;flex:0 0 auto;}
@@ -275,7 +285,8 @@
   #editOverlay{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;backdrop-filter:blur(3px);}
   #editOverlay.show{display:flex;}
   @media(pointer:coarse){#editOverlay.show{align-items:flex-start;padding-top:60px;}}
-  #editBox{background:#111827;border-radius:12px;padding:20px;width:280px;display:flex;flex-direction:column;gap:12px;border:1px solid #374151}
+  /* The status row makes the dialog taller — keep it scrollable on short screens. */
+  #editBox{background:#111827;border-radius:12px;padding:20px;width:280px;display:flex;flex-direction:column;gap:12px;border:1px solid #374151;max-height:calc(100dvh - 80px);overflow-y:auto;}
   #editBox .edit-title{font-family:'Bebas Neue',sans-serif;font-size:20px;color:#60a5fa;letter-spacing:2px}
   #editBox label{font-size:10px;color:#9ca3af;font-weight:bold;margin-bottom:-8px;letter-spacing:1px;}
   #editBox input{height:44px;border:none;border-radius:8px;background:#1f2937;color:#fff;padding:0 14px;font-size:16px;outline:none;touch-action:auto;-webkit-user-select:text;user-select:text;}
@@ -285,6 +296,15 @@
   #editBox button{flex:1;height:40px;border:none;border-radius:8px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;cursor:pointer;}
   #editBox .save-btn{background:#3b82f6;color:#fff}
   #editBox .clear-btn{background:#374151;color:#fff}
+  #editBox .hue-row{display:flex;gap:6px;}
+  /* Class selectors beat the generic `#editBox button` rule above. */
+  #editBox .hue-swatch{flex:1;height:40px;border-radius:8px;border:2px solid transparent;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:10px;letter-spacing:.6px;padding:0;}
+  #editBox .hue-swatch[data-hue=""]{background:#fff;color:#073175;}
+  #editBox .hue-swatch[data-hue="green"]{background:#16a34a;color:#fff;}
+  #editBox .hue-swatch[data-hue="yellow"]{background:#facc15;color:#422006;}
+  #editBox .hue-swatch[data-hue="red"]{background:#dc2626;color:#fff;}
+  #editBox .hue-swatch.selected{border-color:#60a5fa;box-shadow:0 0 0 2px rgba(96,165,250,.4);}
+  #editBox .hue-swatch:focus-visible{outline:2px solid #93c5fd;outline-offset:2px;}
 
   /* ── Inventory ── */
   #inventoryPanel{
@@ -348,6 +368,9 @@
       <button id="eligibilityBtn" type="button" aria-label="Open finals eligibility" aria-haspopup="dialog" aria-controls="eligibilitySheet" aria-expanded="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path><path d="M8 11h6M11 8v6"></path></svg>
         <span>FINALS</span>
+      </button>
+      <button id="shotBtn" type="button" aria-label="Save board image" title="Save board image">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5h3.2l1.4-2.2h8.8l1.4 2.2H21V19H3z"></path><circle cx="12" cy="13.4" r="3.4"></circle></svg>
       </button>
       <button id="refreshBtn">↻ REFRESH</button>
     </div>
@@ -447,6 +470,13 @@
     <input id="editInput" type="text" placeholder="Name…" autocomplete="off"/>
     <label>BADGE (C, 10, 🇮🇪)</label>
     <input id="badgeInput" type="text" placeholder="C, 10, 🇮🇪…" autocomplete="off"/>
+    <label>STATUS</label>
+    <div class="hue-row" id="hueRow" role="group" aria-label="Selection status">
+      <button type="button" class="hue-swatch" data-hue="" aria-pressed="true">NONE</button>
+      <button type="button" class="hue-swatch" data-hue="green" aria-pressed="false">LOCKED</button>
+      <button type="button" class="hue-swatch" data-hue="yellow" aria-pressed="false">MAYBE</button>
+      <button type="button" class="hue-swatch" data-hue="red" aria-pressed="false">OUT</button>
+    </div>
     <div class="btn-row">
       <button class="save-btn" id="editSave">SAVE</button>
       <button class="clear-btn" id="editClear">DELETE</button>
@@ -499,6 +529,8 @@ const syncStatus=document.getElementById('syncStatus'),
       editTitle=document.getElementById('editTitle'),
       editInput=document.getElementById('editInput'),
       badgeInput=document.getElementById('badgeInput'),
+      hueRow=document.getElementById('hueRow'),
+      shotBtn=document.getElementById('shotBtn'),
       editSave=document.getElementById('editSave'),
       editClear=document.getElementById('editClear'),
       editCancel=document.getElementById('editCancel'),
@@ -542,6 +574,17 @@ let boardFixtures={};
 let boardFixturesLoaded=false;
 let fixtureOverlayIntroPending=false;
 let duplicateIntroPending=true;
+let editingHue='';
+
+// Tag fill colours, shared by the DOM magnets and the exported image so the
+// two cannot drift apart.
+const HUES={
+  green:{label:'Locked in',fill:'#16a34a',text:'#ffffff'},
+  yellow:{label:'Unconfirmed',fill:'#facc15',text:'#422006'},
+  red:{label:'Out',fill:'#dc2626',text:'#ffffff'}
+};
+const MAGNET_FILL='#ffffff',MAGNET_TEXT='#073175';
+const CLUB_LOGO_URL='https://aflnational.com/wp-content/uploads/2025/12/UNSW-Eastern-Suburbs-Bulldogs-AFL-footy-club-logo.png';
 
 const positions=[
   {id:'fpl',x:22,y:6,label:'FP'},{id:'ff',x:50,y:4,label:'FF'},{id:'fpr',x:78,y:6,label:'FP'},
@@ -809,15 +852,43 @@ function duplicateNameKeysForBoard(boardId){
   return flagged;
 }
 
+function entryHue(data){
+  const hue=data&&typeof data==='object'?data.hue:'';
+  return HUES[hue]?hue:'';
+}
+
+// Colour alone should not carry the meaning, so the hue is named in the
+// magnet's tooltip alongside any duplicate warning.
+function applyHue(mag,hue){
+  if(!hue)return'';
+  mag.classList.add(`hue-${hue}`);
+  return HUES[hue].label;
+}
+
+function setEditHue(hue){
+  editingHue=HUES[hue]?hue:'';
+  hueRow.querySelectorAll('.hue-swatch').forEach(btn=>{
+    const on=btn.dataset.hue===editingHue;
+    btn.classList.toggle('selected',on);
+    btn.setAttribute('aria-pressed',String(on));
+  });
+}
+
+hueRow.addEventListener('click',e=>{
+  const btn=e.target.closest('.hue-swatch');
+  if(btn)setEditHue(btn.dataset.hue);
+});
+
 function markDuplicateMagnet(mag,name,duplicateInfo){
   const reason=duplicateInfo.get(duplicateNameKey(name));
   if(!reason)return;
   mag.classList.add('duplicate');
   // The pulse is a one-off nudge on first paint, not a permanent animation.
   if(duplicateIntroPending)mag.classList.add('initial-load');
-  mag.title=reason==='exact'
+  const warning=reason==='exact'
     ?`${name} is listed more than once on this board`
     :`${name} looks like another name on this board`;
+  mag.title=mag.title?`${mag.title} · ${warning}`:warning;
 }
 
 function fixtureGradeForBoardName(name){
@@ -1085,6 +1156,7 @@ function renderInventory(boardId){
       mag.style.left=s.x+'%';mag.style.top=s.y+'%';
       const badgeFontSize=(graphemeCount(badge||'')===1)?'15px':'11px';
       mag.innerHTML=`<div class="mag-badge" style="font-size:${badgeFontSize}">${badge||''}</div><div class="mag-name">${name}</div>`;
+      mag.title=applyHue(mag,entryHue(data));
       markDuplicateMagnet(mag,name,duplicateInfo);
       if(!isViewOnly&&!isCloudBlocked){
         mag.addEventListener('pointerdown',ev=>{
@@ -1121,6 +1193,7 @@ function openInventoryEdit(slotId,boardId){
   editingPosId={posId:slotId,boardId,isInventory:true};
   const data=allData.boards[boardId]?.inventory?.[slotId];
   editTitle.textContent='BENCH';
+  setEditHue(entryHue(data));
   editInput.value=typeof data==='object'?data.name:(data||'');
   badgeInput.value=typeof data==='object'?data.badge:'';
   overlay.classList.add('show');setTimeout(()=>{editInput.focus();editInput.select();},50);
@@ -1196,7 +1269,7 @@ function drawOval(groundEl){
     <line x1="${cx + postGap * 0.5}" y1="${cy + ry}" x2="${cx + postGap * 0.5}" y2="${cy + ry - goalH}" stroke="${lineCol}" stroke-width="${strokeW}" />
     <line x1="${cx + postGap * 1.5}" y1="${cy + ry}" x2="${cx + postGap * 1.5}" y2="${cy + ry - behindH}" stroke="${lineCol}" stroke-width="${strokeW}" />
     <rect x="${cx-sq/2}" y="${cy-sq/2}" width="${sq}" height="${sq}" fill="none" stroke="${lineCol}" stroke-width="${strokeW}"/>
-    <image href="https://aflnational.com/wp-content/uploads/2025/12/UNSW-Eastern-Suburbs-Bulldogs-AFL-footy-club-logo.png" x="${cx-36}" y="${cy-36}" height="72" width="72"/>
+    <image href="${CLUB_LOGO_URL}" x="${cx-36}" y="${cy-36}" height="72" width="72"/>
   `;
   groundEl.prepend(svg);
   const div=document.createElement('div');div.className='divider';div.style.top='76%';groundEl.appendChild(div);
@@ -1288,6 +1361,7 @@ function renderBoard(boardId,groundEl){
       const badgeColor=isEmg?'#ff4444':'#fff';
       const badgeFontSize=(graphemeCount(displayBadge)===1)?'15px':'11px';
       mag.innerHTML=`<div class="mag-badge" style="font-size:${badgeFontSize};color:${badgeColor}">${displayBadge}</div><div class="mag-name">${name}</div>`;
+      mag.title=applyHue(mag,entryHue(data));
       markDuplicateMagnet(mag,name,duplicateInfo);
       mag.dataset.posId=p.id;
       mag.dataset.boardId=boardId;
@@ -1781,6 +1855,242 @@ document.addEventListener('pointerdown',e=>{
   toggleInventory();
 },{passive:true});
 
+// ── BOARD IMAGE EXPORT ──
+// Painted from board data onto a canvas rather than screenshotting the DOM.
+// That keeps the output cropped to the ground itself and free of coach mode,
+// the top bar and the board dots by construction, with no capture library.
+const SHOT_WIDTH=1080;
+const SHOT_PAD=30;
+const SHOT_HEADER=104;
+
+function shotFont(ctx,font,spacing){
+  ctx.font=font;
+  // Supported in current Chrome/Safari; harmless to skip where it is not.
+  if('letterSpacing' in ctx)ctx.letterSpacing=spacing||'0px';
+}
+
+function shotFit(ctx,text,maxWidth){
+  if(ctx.measureText(text).width<=maxWidth)return text;
+  let cut=text;
+  while(cut.length>1&&ctx.measureText(cut+'…').width>maxWidth)cut=cut.slice(0,-1);
+  return cut+'…';
+}
+
+function shotRoundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);
+  else ctx.rect(x,y,w,h);
+  return ctx;
+}
+
+// Resolved before drawing so the canvas is never tainted: an image fetched
+// without CORS would make toBlob throw, so a logo we cannot load cleanly is
+// simply left out of the export.
+function loadClubLogo(){
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.crossOrigin='anonymous';
+    img.onload=()=>resolve(img);
+    img.onerror=()=>resolve(null);
+    img.src=CLUB_LOGO_URL;
+  });
+}
+
+function shotFixtureLines(boardId){
+  const grade=fixtureGradeForBoardName(allData.boards[boardId]?.name);
+  const fixture=grade?boardFixtures[grade]:null;
+  if(!fixture)return null;
+  if(fixture.bye){
+    return {kicker:'THIS WEEK',match:'BYE',sub:fixture.nextDate
+      ?`NEXT · ${fixture.nextRound||'TBC'} · ${formatFixtureDate(fixture.nextDate)}`:''};
+  }
+  const opponent=fixture.opponent||'Opponent TBC';
+  const prefix=fixture.side==='away'?'@':'vs';
+  return {
+    kicker:`${fixture.round||'Upcoming'} · ${formatFixtureDate(fixture.date)}`,
+    match:`${formatFixtureTime(fixture.time)} · ${prefix} ${opponent}`,
+    sub:fixture.side==='away'&&fixture.venue?fixture.venue:''
+  };
+}
+
+async function buildBoardImage(boardId){
+  const board=allData.boards[boardId];
+  const groundEl=getBoardElement(boardId);
+  const lw=groundEl.clientWidth,lh=groundEl.clientHeight;
+  if(!board||!lw||!lh)throw new Error('Board not ready');
+
+  const scale=(SHOT_WIDTH-SHOT_PAD*2)/lw;
+  const canvas=document.createElement('canvas');
+  canvas.width=SHOT_WIDTH;
+  canvas.height=Math.round(SHOT_HEADER+lh*scale+SHOT_PAD);
+  const ctx=canvas.getContext('2d');
+  // Board-local pixels to canvas pixels.
+  const X=lx=>SHOT_PAD+lx*scale;
+  const Y=ly=>SHOT_HEADER+ly*scale;
+  const S=n=>n*scale;
+
+  ctx.fillStyle='#051b43';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.textAlign='left';
+  ctx.textBaseline='alphabetic';
+  ctx.fillStyle='#ffffff';
+  shotFont(ctx,"700 40px 'Bebas Neue', sans-serif",'3px');
+  ctx.fillText(shotFit(ctx,(board.name||'BOARD').toUpperCase(),SHOT_WIDTH-SHOT_PAD*2),SHOT_PAD,58);
+
+  const fixtureLines=shotFixtureLines(boardId);
+  if(fixtureLines){
+    ctx.fillStyle='rgba(255,255,255,.5)';
+    shotFont(ctx,"700 18px 'Barlow Condensed', sans-serif",'2px');
+    const header=[fixtureLines.kicker,fixtureLines.match,fixtureLines.sub]
+      .filter(Boolean).join('  ·  ').toUpperCase();
+    ctx.fillText(shotFit(ctx,header,SHOT_WIDTH-SHOT_PAD*2),SHOT_PAD,84);
+  }
+
+  // Ground, mirroring drawOval's proportions.
+  const cx=lw*0.5,cy=lh*0.38,rx=lw*0.46,ry=lh*0.37,sq=lw*0.42;
+  const line='rgba(255,255,255,0.3)';
+  ctx.strokeStyle=line;
+  ctx.lineWidth=S(3);
+  ctx.beginPath();
+  ctx.ellipse(X(cx),Y(cy),S(rx),S(ry),0,0,Math.PI*2);
+  ctx.stroke();
+
+  const goalH=22,behindH=14,postGap=12;
+  [[-1.5,behindH],[-0.5,goalH],[0.5,goalH],[1.5,behindH]].forEach(([mult,len])=>{
+    ctx.beginPath();
+    ctx.moveTo(X(cx+postGap*mult),Y(cy-ry));
+    ctx.lineTo(X(cx+postGap*mult),Y(cy-ry+len));
+    ctx.moveTo(X(cx+postGap*mult),Y(cy+ry));
+    ctx.lineTo(X(cx+postGap*mult),Y(cy+ry-len));
+    ctx.stroke();
+  });
+  ctx.strokeRect(X(cx-sq/2),Y(cy-sq/2),S(sq),S(sq));
+
+  const logo=await loadClubLogo();
+  if(logo)ctx.drawImage(logo,X(cx-36),Y(cy-36),S(72),S(72));
+
+  // Divider and bench captions.
+  ctx.fillStyle='rgba(255,255,255,0.1)';
+  ctx.fillRect(X(lw*0.05),Y(lh*0.76),S(lw*0.9),Math.max(1,S(1)));
+
+  ctx.textBaseline='top';
+  ctx.fillStyle='rgba(255,255,255,0.2)';
+  shotFont(ctx,"400 11px 'Bebas Neue', sans-serif",'3px');
+  ctx.textAlign='center';
+  ctx.fillText('INTERCHANGE',X(lw*0.5),Y(lh*0.765));
+  ctx.textAlign='right';
+  ctx.fillText('EMERGENCY',X(lw*0.95),Y(lh*0.765));
+
+  ctx.textAlign='center';
+  shotFont(ctx,"400 14px 'Bebas Neue', sans-serif",'4px');
+  zones.forEach(z=>ctx.fillText(z.label,X(lw*0.5),Y(lh*(z.y/100))));
+
+  if(fixtureLines){
+    ctx.textAlign='center';
+    ctx.fillStyle='rgba(255,255,255,.2)';
+    shotFont(ctx,"700 11px 'Barlow Condensed', sans-serif",'2px');
+    ctx.fillText(fixtureLines.kicker.toUpperCase(),X(lw*0.5),Y(lh*0.54));
+    ctx.fillStyle=fixtureLines.match==='BYE'?'rgba(191,219,254,.3)':'rgba(255,255,255,.28)';
+    shotFont(ctx,"400 21px 'Bebas Neue', sans-serif",fixtureLines.match==='BYE'?'6px':'1.5px');
+    ctx.fillText(fixtureLines.match.toUpperCase(),X(lw*0.5),Y(lh*0.54)+S(16));
+  }
+
+  // Player tags.
+  ctx.textBaseline='middle';
+  positions.forEach(p=>{
+    const data=board.roster?.[p.id];
+    const name=(typeof data==='object'?data?.name:data)||'';
+    const magW=p.bench?60:70,magH=20;
+    const left=(p.x/100)*lw-magW/2+5;
+    const top=(p.y/100)*lh-magH/2;
+
+    if(!name){
+      // Empty extra-bench rows would only add clutter to a shared team sheet.
+      if(p.label==='---')return;
+      ctx.save();
+      ctx.setLineDash([S(4),S(3)]);
+      ctx.strokeStyle='rgba(255,255,255,0.2)';
+      ctx.lineWidth=Math.max(1,S(1));
+      ctx.strokeRect(X((p.x/100)*lw-(p.bench?70:80)/2),Y(top),S(p.bench?70:80),S(magH));
+      ctx.restore();
+      ctx.fillStyle='rgba(255,255,255,0.2)';
+      ctx.textAlign='center';
+      shotFont(ctx,"700 8px 'Barlow Condensed', sans-serif",'0px');
+      ctx.fillText(p.label,X((p.x/100)*lw),Y(top+magH/2));
+      return;
+    }
+
+    const hue=entryHue(data);
+    ctx.fillStyle=hue?HUES[hue].fill:MAGNET_FILL;
+    shotRoundRect(ctx,X(left),Y(top),S(magW),S(magH),S(2));
+    ctx.fill();
+
+    const badge=p.id==='emg'?'E':((typeof data==='object'?data?.badge:'')||'');
+    if(badge){
+      ctx.beginPath();
+      ctx.arc(X(left+1),Y(top+magH/2),S(11),0,Math.PI*2);
+      ctx.fillStyle='#6786b8';
+      ctx.fill();
+      ctx.strokeStyle='#fff';
+      ctx.lineWidth=S(1.5);
+      ctx.stroke();
+      ctx.fillStyle=p.id==='emg'?'#ff4444':'#fff';
+      ctx.textAlign='center';
+      shotFont(ctx,`700 ${graphemeCount(badge)===1?15:11}px 'Barlow Condensed', sans-serif`,'0px');
+      ctx.fillText(badge,X(left+1),Y(top+magH/2));
+    }
+
+    ctx.fillStyle=hue?HUES[hue].text:MAGNET_TEXT;
+    ctx.textAlign='left';
+    shotFont(ctx,`700 ${p.bench?12:13}px 'Barlow Condensed', sans-serif`,'0px');
+    const textLeft=left+(p.bench?12:16);
+    const textRoom=magW-(p.bench?14:20);
+    ctx.fillText(shotFit(ctx,name,S(textRoom)),X(textLeft),Y(top+magH/2));
+  });
+
+  return canvas;
+}
+
+async function exportBoardImage(){
+  if(!currentBoardId||shotBtn.disabled)return;
+  shotBtn.disabled=true;
+  try{
+    if(document.fonts&&document.fonts.ready)await document.fonts.ready;
+    const canvas=await buildBoardImage(currentBoardId);
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+    if(!blob)throw new Error('Canvas export produced no image');
+    const slug=(allData.boards[currentBoardId]?.name||'board')
+      .replace(/[^\w\s-]/g,'').trim().replace(/\s+/g,'-').toLowerCase()||'board';
+    const fileName=`${slug}-team.png`;
+    const file=new File([blob],fileName,{type:'image/png'});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      try{
+        await navigator.share({files:[file],title:allData.boards[currentBoardId]?.name||'Team'});
+      }catch(shareErr){
+        // Dismissing the share sheet is not a failure.
+        if(shareErr&&shareErr.name==='AbortError')return;
+        throw shareErr;
+      }
+      return;
+    }
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement('a');
+    link.href=url;link.download=fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    showMessage('IMAGE SAVED');
+  }catch(err){
+    showMessage('IMAGE FAILED');
+  }finally{
+    shotBtn.disabled=false;
+  }
+}
+
+shotBtn.addEventListener('click',exportBoardImage);
+
 // ── EDITING ──
 function openEdit(posId,boardId){
   if (isViewOnly||isCloudBlocked) return;
@@ -1790,6 +2100,7 @@ function openEdit(posId,boardId){
   editTitle.textContent=posLabel;
   editInput.value=typeof data==='object'?data.name:(data||'');
   badgeInput.value=typeof data==='object'?data.badge:'';
+  setEditHue(entryHue(data));
   overlay.classList.add('show'); setTimeout(()=>{editInput.focus();editInput.select();},50);
 }
 
@@ -1799,14 +2110,18 @@ editSave.addEventListener('click', e => {
   if(!editingPosId)return;
   const {posId,boardId,isInventory}=editingPosId;
   const name=editInput.value.trim(),badge=limitGraphemes(badgeInput.value.trim(),2);
+  // hue is omitted rather than stored empty, so untouched tags keep the shape
+  // they already have in the cloud payload.
+  const entry={name,badge};
+  if(editingHue)entry.hue=editingHue;
   if(isInventory){
     if(!allData.boards[boardId].inventory) allData.boards[boardId].inventory={};
-    if(name) allData.boards[boardId].inventory[posId]={name,badge};
+    if(name) allData.boards[boardId].inventory[posId]=entry;
     else delete allData.boards[boardId].inventory[posId];
     saveToCloud(); renderInventory(boardId);
   } else {
     const r=allData.boards[boardId].roster;
-    if(name)r[posId]={name,badge}; else delete r[posId];
+    if(name)r[posId]=entry; else delete r[posId];
     saveToCloud(); renderBoard(boardId,getBoardElement(boardId));
   }
   closeEdit();
