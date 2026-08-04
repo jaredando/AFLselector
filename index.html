@@ -68,7 +68,12 @@
      the way a spell-check squiggle does; the ring makes it findable among 22
      magnets without having to read every name. */
   .magnet.duplicate{box-shadow:0 2px 6px rgba(0,0,0,0.3),0 0 0 1.5px #dc2626;}
-  .magnet.duplicate .mag-name{text-decoration:underline wavy #dc2626;text-underline-offset:2px;text-decoration-thickness:1.5px;}
+  /* .mag-name needs overflow:hidden for the ellipsis, which clips the wave to
+     its line box. A thinner wave sits closer under the letters, and the taller
+     line-height adds room below the baseline for it. Both halves of the extra
+     leading fall outside the glyphs, so the centred text does not move and the
+     font size is untouched. */
+  .magnet.duplicate .mag-name{line-height:1.5;text-decoration:underline wavy #dc2626;text-underline-offset:1px;text-decoration-thickness:1px;}
   .magnet.duplicate.initial-load{animation:duplicate-pulse 1.4s ease-in-out 4;}
   @keyframes duplicate-pulse{
     0%,100%{box-shadow:0 2px 6px rgba(0,0,0,0.3),0 0 0 1.5px #dc2626}
