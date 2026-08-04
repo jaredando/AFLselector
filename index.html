@@ -1939,14 +1939,16 @@ async function buildBoardImage(boardId){
   ctx.textAlign='left';
   ctx.textBaseline='alphabetic';
   ctx.fillStyle='#ffffff';
-  shotFont(ctx,"700 40px 'Bebas Neue', sans-serif",'3px');
+  shotFont(ctx,"400 40px 'Bebas Neue', sans-serif",'3px');
   ctx.fillText(shotFit(ctx,(board.name||'BOARD').toUpperCase(),SHOT_WIDTH-SHOT_PAD*2),SHOT_PAD,58);
 
   const fixtureLines=shotFixtureLines(boardId);
   if(fixtureLines){
     ctx.fillStyle='rgba(255,255,255,.5)';
     shotFont(ctx,"700 18px 'Barlow Condensed', sans-serif",'2px');
-    const header=[fixtureLines.kicker,fixtureLines.match,fixtureLines.sub]
+    // The ground name / next round is drawn on the board below, so it is left
+    // out here rather than pushing the header into an ellipsis.
+    const header=[fixtureLines.kicker,fixtureLines.match]
       .filter(Boolean).join('  ·  ').toUpperCase();
     ctx.fillText(shotFit(ctx,header,SHOT_WIDTH-SHOT_PAD*2),SHOT_PAD,84);
   }
@@ -1998,6 +2000,13 @@ async function buildBoardImage(boardId){
     ctx.fillStyle=fixtureLines.match==='BYE'?'rgba(191,219,254,.3)':'rgba(255,255,255,.28)';
     shotFont(ctx,"400 21px 'Bebas Neue', sans-serif",fixtureLines.match==='BYE'?'6px':'1.5px');
     ctx.fillText(fixtureLines.match.toUpperCase(),X(lw*0.5),Y(lh*0.54)+S(16));
+    // Ground name on an away game, or the next round when this week is a bye —
+    // the same third line the board itself shows under the match.
+    if(fixtureLines.sub){
+      ctx.fillStyle='rgba(255,255,255,.2)';
+      shotFont(ctx,"700 11px 'Barlow Condensed', sans-serif",'2px');
+      ctx.fillText(fixtureLines.sub.toUpperCase(),X(lw*0.5),Y(lh*0.54)+S(41));
+    }
   }
 
   // Player tags.
@@ -2066,6 +2075,16 @@ async function exportBoardImage(){
   if(!currentBoardId||shotBtn.disabled)return;
   shotBtn.disabled=true;
   try{
+    // fonts.ready only covers faces already requested at the sizes already used,
+    // and canvas silently falls back to a system font otherwise — which is what
+    // makes an export look nothing like the board. Ask for each face explicitly.
+    if(document.fonts&&document.fonts.load){
+      await Promise.all([
+        "400 40px 'Bebas Neue'","400 21px 'Bebas Neue'","400 14px 'Bebas Neue'","400 11px 'Bebas Neue'",
+        "700 18px 'Barlow Condensed'","700 13px 'Barlow Condensed'","700 12px 'Barlow Condensed'",
+        "700 11px 'Barlow Condensed'","700 8px 'Barlow Condensed'","700 15px 'Barlow Condensed'"
+      ].map(face=>document.fonts.load(face).catch(()=>null)));
+    }
     if(document.fonts&&document.fonts.ready)await document.fonts.ready;
     const canvas=await buildBoardImage(currentBoardId);
     const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
