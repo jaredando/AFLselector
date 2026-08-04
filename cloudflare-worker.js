@@ -111,6 +111,110 @@ async function fetchVenueName(gameId) {
   return null;
 }
 
+// Canvas cannot use an image whose host sends no CORS headers without tainting
+// itself and breaking toBlob, and neither PlayHQ's CDN nor the club site can be
+// relied on to send them. The worker re-serves the bytes instead. The allowlist
+// is what stops this being an open relay for arbitrary URLs.
+const LOGO_HOSTS = new Set([
+  "assets.playhq.com",
+  "cdn.playhq.com",
+  "images.playhq.com",
+  "aflnational.com",
+  "www.aflnational.com"
+]);
+
+async function handleLogo(request, env) {
+  if (request.method !== "GET") {
+    return jsonResponse({ error: "Method not allowed" }, env, 405);
+  }
+  const src = new URL(request.url).searchParams.get("src");
+  if (!src) return jsonResponse({ error: "Missing src" }, env, 400);
+
+  let target;
+  try {
+    target = new URL(src);
+  } catch (error) {
+    return jsonResponse({ error: "Invalid src" }, env, 400);
+  }
+  if (target.protocol !== "https:" || !LOGO_HOSTS.has(target.hostname)) {
+    return jsonResponse({ error: "Host not allowed" }, env, 403);
+  }
+
+  const upstream = await fetch(target.toString(), {
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; AFLSelector/1.0)" }
+  });
+  if (!upstream.ok) {
+    return jsonResponse({ error: `Upstream returned ${upstream.status}` }, env, 502);
+  }
+  const contentType = upstream.headers.get("Content-Type") || "";
+  if (!contentType.startsWith("image/")) {
+    return jsonResponse({ error: "Not an image" }, env, 415);
+  }
+  return new Response(upstream.body, {
+    headers: {
+      ...corsHeaders(env),
+      "Content-Type": contentType,
+      "Cache-Control": "public, max-age=86400"
+    }
+  });
+}
+
+function proxiedLogo(request, url) {
+  if (!url) return null;
+  return `${new URL(request.url).origin}/logo?src=${encodeURIComponent(url)}`;
+}
+
+// Same reasoning as the venue lookup: the schema could not be introspected, so
+// the candidate shapes are tried in their own request and the first that works
+// is remembered. A miss leaves the crests out rather than failing /fixtures.
+const LOGO_QUERIES = [
+  `query GameLogos($gameId: ID!) {
+    discoverGame(gameID: $gameId) {
+      home { ... on DiscoverTeam { organisation { logo { sizes { url } } } } }
+      away { ... on DiscoverTeam { organisation { logo { sizes { url } } } } }
+    }
+  }`,
+  `query GameLogos($gameId: ID!) {
+    discoverGame(gameID: $gameId) {
+      home { ... on DiscoverTeam { organisation { logo { url } } } }
+      away { ... on DiscoverTeam { organisation { logo { url } } } }
+    }
+  }`,
+  `query GameLogos($gameId: ID!) {
+    discoverGame(gameID: $gameId) {
+      home { ... on DiscoverTeam { club { logo { url } } } }
+      away { ... on DiscoverTeam { club { logo { url } } } }
+    }
+  }`
+];
+let workingLogoQuery = null;
+
+function logoUrlFrom(side) {
+  const logo = side?.organisation?.logo || side?.club?.logo;
+  if (!logo) return null;
+  if (typeof logo.url === "string") return logo.url;
+  const sizes = Array.isArray(logo.sizes) ? logo.sizes : [];
+  const withUrl = sizes.filter(size => typeof size?.url === "string");
+  return withUrl.length ? withUrl[withUrl.length - 1].url : null;
+}
+
+async function fetchGameLogos(gameId) {
+  const attempts = workingLogoQuery ? [workingLogoQuery] : LOGO_QUERIES;
+  for (const query of attempts) {
+    try {
+      const game = (await playHqQuery(query, { gameId }))?.discoverGame;
+      const home = logoUrlFrom(game?.home);
+      const away = logoUrlFrom(game?.away);
+      if (!home && !away) continue;
+      workingLogoQuery = query;
+      return { home, away };
+    } catch (error) {
+      // Wrong shape for this tenant — try the next candidate.
+    }
+  }
+  return { home: null, away: null };
+}
+
 function corsHeaders(env) {
   return {
     "Access-Control-Allow-Origin": env.ALLOWED_ORIGIN || "*",
@@ -224,7 +328,7 @@ function forfeitState(game, side) {
   return null;
 }
 
-async function buildBoardFixtures(now = new Date()) {
+async function buildBoardFixtures(request, now = new Date()) {
   const today = dateKeyInTimeZone(now, SYDNEY_TIME_ZONE);
   const week = weekWindow(now);
   const fixtureEntries = await Promise.all(BOARD_FIXTURE_TEAMS.map(async team => {
@@ -260,6 +364,13 @@ async function buildBoardFixtures(now = new Date()) {
     // No real game inside the current week means the grade is on a bye. The next
     // fixture is still reported so the board can say when the team is out again,
     // but it must not be presented as this week's match.
+    // Crests are proxied through /logo so the board's canvas export can draw
+    // them without tainting itself. The club's own crest is still worth having
+    // on a bye, since the exported image is headed with it either way.
+    const logos = await fetchGameLogos(next.game.id);
+    const ourLogo = proxiedLogo(request, next.side === "home" ? logos.home : logos.away);
+    const theirLogo = proxiedLogo(request, next.side === "home" ? logos.away : logos.home);
+
     if (!playsThisWeek) {
       return [team.shortName, {
         gameId: null,
@@ -273,11 +384,15 @@ async function buildBoardFixtures(now = new Date()) {
         venue: null,
         status: null,
         forfeit: null,
+        clubLogo: ourLogo,
+        opponentLogo: null,
         nextRound: next.roundName,
         nextDate: next.game.date
       }];
     }
     return [team.shortName, {
+      clubLogo: ourLogo,
+      opponentLogo: theirLogo,
       gameId: next.game.id,
       round: next.roundName,
       date: next.game.date,
@@ -308,7 +423,7 @@ async function handleBoardFixtures(request, env) {
     return jsonResponse({ error: "Method not allowed" }, env, 405);
   }
   try {
-    return jsonResponse(await buildBoardFixtures(), env);
+    return jsonResponse(await buildBoardFixtures(request), env);
   } catch (error) {
     return jsonResponse({ error: "Could not load PlayHQ fixtures", detail: error.message }, env, 502);
   }
@@ -634,6 +749,9 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/eligibility") {
       return handleEligibility(request, env);
+    }
+    if (url.pathname === "/logo") {
+      return handleLogo(request, env);
     }
     if (url.pathname === "/fixtures") {
       return handleBoardFixtures(request, env);

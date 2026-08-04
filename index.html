@@ -593,6 +593,10 @@ const HUES={
 };
 const MAGNET_FILL='#ffffff',MAGNET_TEXT='#073175';
 const CLUB_LOGO_URL='https://aflnational.com/wp-content/uploads/2025/12/UNSW-Eastern-Suburbs-Bulldogs-AFL-footy-club-logo.png';
+// The board's SVG can use the origin directly, but canvas cannot: aflnational
+// sends no CORS headers, so drawing it would taint the canvas and make toBlob
+// throw. The worker re-serves it. PlayHQ crests arrive already proxied.
+const CLUB_LOGO_EXPORT_URL=`${CLOUD_SYNC_URL}/logo?src=${encodeURIComponent(CLUB_LOGO_URL)}`;
 
 const positions=[
   {id:'fpl',x:22,y:6,label:'FP'},{id:'ff',x:50,y:4,label:'FF'},{id:'fpr',x:78,y:6,label:'FP'},
@@ -1935,14 +1939,26 @@ function shotTag(ctx,cx,cy,w,h,opts){
 // Resolved before drawing so the canvas is never tainted: an image fetched
 // without CORS would make toBlob throw, so a logo we cannot load cleanly is
 // simply left out of the export.
-function loadClubLogo(){
+function loadCrest(url){
+  if(!url)return Promise.resolve(null);
   return new Promise(resolve=>{
     const img=new Image();
     img.crossOrigin='anonymous';
     img.onload=()=>resolve(img);
     img.onerror=()=>resolve(null);
-    img.src=CLUB_LOGO_URL;
+    img.src=url;
   });
+}
+
+// The club crest from PlayHQ when the feed carries one, otherwise the club
+// site's version through the same proxy.
+function shotCrestUrls(boardId){
+  const grade=fixtureGradeForBoardName(allData.boards[boardId]?.name);
+  const fixture=grade?boardFixtures[grade]:null;
+  return {
+    club:fixture?.clubLogo||CLUB_LOGO_EXPORT_URL,
+    opponent:fixture?.opponentLogo||null
+  };
 }
 
 function shotFixtureLines(boardId){
@@ -1986,7 +2002,8 @@ async function buildBoardImage(boardId){
   ctx.fillStyle=glow;
   ctx.fillRect(0,0,SHOT_W,SHOT_H);
 
-  const logo=await loadClubLogo();
+  const crests=shotCrestUrls(boardId);
+  const [logo,oppLogo]=await Promise.all([loadCrest(crests.club),loadCrest(crests.opponent)]);
   const fixtureLines=shotFixtureLines(boardId);
 
   // ── Header ──
@@ -1997,18 +2014,23 @@ async function buildBoardImage(boardId){
     ctx.drawImage(logo,SHOT_MARGIN,30,96,96);
     titleX=SHOT_MARGIN+116;
   }
+  // Opponent crest mirrored top-right, the way a published team sheet frames
+  // the two clubs.
+  if(oppLogo)ctx.drawImage(oppLogo,SHOT_W-SHOT_MARGIN-88,34,88,88);
+  // Header text must not run under either crest.
+  const headTextW=contentW-(titleX-SHOT_MARGIN)-(oppLogo?110:0);
   ctx.fillStyle='#ffffff';
   shotFont(ctx,"400 66px 'Bebas Neue', sans-serif",'3px');
-  ctx.fillText(shotFit(ctx,(board.name||'BOARD').toUpperCase(),contentW-(titleX-SHOT_MARGIN)),titleX,86);
+  ctx.fillText(shotFit(ctx,(board.name||'BOARD').toUpperCase(),headTextW),titleX,86);
   if(fixtureLines){
     ctx.fillStyle='rgba(191,219,254,.82)';
     shotFont(ctx,"700 23px 'Barlow Condensed', sans-serif",'2.2px');
     const line=[fixtureLines.kicker,fixtureLines.match].filter(Boolean).join('  ·  ').toUpperCase();
-    ctx.fillText(shotFit(ctx,line,contentW-(titleX-SHOT_MARGIN)),titleX,122);
+    ctx.fillText(shotFit(ctx,line,headTextW),titleX,122);
     if(fixtureLines.sub){
       ctx.fillStyle='rgba(147,197,253,.6)';
       shotFont(ctx,"700 20px 'Barlow Condensed', sans-serif",'2px');
-      ctx.fillText(shotFit(ctx,fixtureLines.sub.toUpperCase(),contentW-(titleX-SHOT_MARGIN)),titleX,152);
+      ctx.fillText(shotFit(ctx,fixtureLines.sub.toUpperCase(),headTextW),titleX,152);
     }
   }
   ctx.fillStyle='rgba(147,197,253,.22)';
